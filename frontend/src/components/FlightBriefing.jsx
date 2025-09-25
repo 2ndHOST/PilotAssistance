@@ -42,104 +42,155 @@ const FlightBriefing = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Flight Briefing</h1>
-        <p className="text-slate-600 mt-1">
-          Get comprehensive weather briefing for your flight route
-        </p>
-      </div>
-
-      {/* Route Input Form */}
-      <div className="aviation-card p-6">
-        <h2 className="text-xl font-semibold text-slate-900 mb-4">Flight Route</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Origin Airport (ICAO)
-              </label>
-              <input
-                type="text"
-                value={route.origin}
-                onChange={(e) => setRoute({...route, origin: e.target.value.toUpperCase()})}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-aviation-500 focus:border-aviation-500"
-                placeholder="KJFK"
-                maxLength={4}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Destination Airport (ICAO)
-              </label>
-              <input
-                type="text"
-                value={route.destination}
-                onChange={(e) => setRoute({...route, destination: e.target.value.toUpperCase()})}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-aviation-500 focus:border-aviation-500"
-                placeholder="KLAX"
-                maxLength={4}
-                required
-              />
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Hero Section */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg mb-6">
+            <Plane className="h-8 w-8 text-white" />
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Alternate Airports (ICAO)
-            </label>
-            <input
-              type="text"
-              value={route.alternates[0]}
-              onChange={(e) => setRoute({...route, alternates: [e.target.value.toUpperCase()]})}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-aviation-500 focus:border-aviation-500"
-              placeholder="KORD (optional)"
-              maxLength={4}
-            />
-          </div>
+          <h1 className="text-3.5xl sm:text-4.5xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-4">
+            Flight Briefing
+          </h1>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            Get comprehensive weather briefings and flight planning assistance for your route
+          </p>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading || !route.origin || !route.destination}
-            className="w-full bg-aviation-600 text-white px-6 py-3 rounded-lg hover:bg-aviation-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {loading ? 'Generating Briefing...' : 'Get Flight Briefing'}
-          </button>
-        </form>
-      </div>
-
-      {/* Briefing Results */}
-      {briefingData && (
-        <div className="space-y-6">
-          {briefingData.error ? (
-            <div className="aviation-card p-6 border-red-200 bg-red-50">
-              <div className="flex items-center space-x-2 text-red-700 mb-2">
-                <AlertTriangle className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">Error Loading Briefing</h2>
-              </div>
-              <p className="text-red-600">{briefingData.error}</p>
+        {/* Main Form Card */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 sm:p-10 lg:p-12 xl:p-16">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Flight Route Planning</h2>
+              <p className="text-slate-600">Enter your flight details to get started</p>
             </div>
-          ) : (
-            <>
-              {/* Briefing Summary */}
-              <div className="aviation-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-slate-900 flex items-center">
-                    <Plane className="h-5 w-5 mr-2" />
-                    Flight Briefing Summary
-                  </h2>
-                  <div className="flex items-center space-x-2">
-                    <TTSControls 
-                      briefingData={briefingData}
-                      size="large"
-                      className="relative"
+            
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    Origin Airport
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={route.origin}
+                      onChange={(e) => setRoute({...route, origin: e.target.value.toUpperCase()})}
+                      className="w-full h-14 px-6 text-lg font-medium bg-white/80 border-2 border-slate-200 rounded-2xl placeholder-slate-400 focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-300 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      placeholder="KJFK"
+                      maxLength={4}
+                      required
                     />
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSeverityColor(briefingData.summary?.worstSeverity)}`}>
-                      {briefingData.summary?.worstSeverity?.toUpperCase() || 'UNKNOWN'}
-                    </span>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
+                    </div>
                   </div>
                 </div>
+                
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    Destination Airport
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={route.destination}
+                      onChange={(e) => setRoute({...route, destination: e.target.value.toUpperCase()})}
+                      className="w-full h-14 px-6 text-lg font-medium bg-white/80 border-2 border-slate-200 rounded-2xl placeholder-slate-400 focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-300 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      placeholder="KLAX"
+                      maxLength={4}
+                      required
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3 pt-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  Alternate Airport <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={route.alternates[0]}
+                    onChange={(e) => setRoute({...route, alternates: [e.target.value.toUpperCase()]})}
+                    className="w-full h-14 px-6 text-lg font-medium bg-white/80 border-2 border-slate-200 rounded-2xl placeholder-slate-400 focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-300 shadow-sm hover:shadow-md backdrop-blur-sm"
+                    placeholder="KORD"
+                    maxLength={4}
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-8">
+                <button
+                  type="submit"
+                  disabled={loading || !route.origin || !route.destination}
+                  className="w-full h-16 text-lg font-bold text-white rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 active:translate-y-0 relative overflow-hidden group"
+                >
+                  <span className="relative z-10 flex items-center justify-center">
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                        Generating Briefing...
+                      </>
+                    ) : (
+                      <>
+                        <Plane className="h-5 w-5 mr-3" />
+                        Get Flight Briefing
+                      </>
+                    )}
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Briefing Results */}
+        {briefingData && (
+          <div className="mt-16 space-y-8">
+            {briefingData.error ? (
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-red-50/80 backdrop-blur-xl rounded-3xl shadow-xl border border-red-200/50 p-8">
+                  <div className="flex items-center space-x-3 text-red-700 mb-4">
+                    <div className="p-2 bg-red-100 rounded-xl">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <h2 className="text-xl font-bold">Error Loading Briefing</h2>
+                  </div>
+                  <p className="text-red-600 text-lg">{briefingData.error}</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Briefing Summary */}
+                <div className="max-w-6xl mx-auto">
+                  <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
+                          <Plane className="h-6 w-6 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-900">Flight Briefing Summary</h2>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <TTSControls 
+                          briefingData={briefingData}
+                          size="large"
+                          className="relative"
+                        />
+                        <span className={`px-4 py-2 rounded-2xl text-sm font-bold ${getSeverityColor(briefingData.summary?.worstSeverity)}`}>
+                          {briefingData.summary?.worstSeverity?.toUpperCase() || 'UNKNOWN'}
+                        </span>
+                      </div>
+                    </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
@@ -195,50 +246,60 @@ const FlightBriefing = () => {
                     />
                   </div>
                 </div>
-              </div>
-              
-              {/* Airport Weather Details */}
-              {briefingData.airports && Object.keys(briefingData.airports).length > 0 && (
-                <div className="aviation-card p-6">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2" />
-                    Airport Weather Details
-                  </h2>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {Object.entries(briefingData.airports).map(([icao, data]) => (
-                      <div key={icao}>
-                        <h3 className="text-lg font-semibold mb-2 flex items-center">
-                          {icao}
-                          <span className="ml-2 text-sm px-2 py-1 bg-slate-100 text-slate-600 rounded">
-                            {data.role}
-                          </span>
-                        </h3>
-                        {data.metar && (
-                          <WeatherCard 
-                            data={data.metar}
-                            loading={false}
-                          />
-                        )}
-                      </div>
-                    ))}
                   </div>
                 </div>
-              )}
               
-              {/* Flight Map */}
-              <FlightMap 
-                route={briefingData.route}
-                airports={Object.entries(briefingData.airports || {}).map(([icao, data]) => ({
-                  icao,
-                  severity: data.metar?.severity || { level: 'unknown' },
-                  conditions: data.metar?.decoded?.summary || 'No data'
-                }))}
-                height="500px"
-              />
-            </>
-          )}
-        </div>
-      )}
+                {/* Airport Weather Details */}
+                {briefingData.airports && Object.keys(briefingData.airports).length > 0 && (
+                  <div className="max-w-6xl mx-auto mt-8">
+                    <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
+                      <div className="flex items-center space-x-4 mb-8">
+                        <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg">
+                          <MapPin className="h-6 w-6 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-900">Airport Weather Details</h2>
+                      </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {Object.entries(briefingData.airports).map(([icao, data]) => (
+                          <div key={icao} className="bg-white/50 rounded-2xl p-6 border border-white/30">
+                            <h3 className="text-xl font-bold mb-4 flex items-center">
+                              {icao}
+                              <span className="ml-3 text-sm px-3 py-1 bg-slate-100 text-slate-600 rounded-xl font-medium">
+                                {data.role}
+                              </span>
+                            </h3>
+                            {data.metar && (
+                              <WeatherCard 
+                                data={data.metar}
+                                loading={false}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Flight Map */}
+                <div className="max-w-6xl mx-auto mt-8">
+                  <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
+                    <FlightMap 
+                      route={briefingData.route}
+                      airports={Object.entries(briefingData.airports || {}).map(([icao, data]) => ({
+                        icao,
+                        severity: data.metar?.severity || { level: 'unknown' },
+                        conditions: data.metar?.decoded?.summary || 'No data'
+                      }))}
+                      height="500px"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
