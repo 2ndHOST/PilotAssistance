@@ -109,71 +109,62 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Header with Stats in One Line */}
+      <div className="flex items-center justify-between gap-6">
+        {/* Pilot Dashboard Title */}
+        <div className="flex-shrink-0">
           <h1 className="text-3xl font-bold text-slate-900">Pilot Dashboard</h1>
           <p className="text-slate-600 mt-1">
             Weather conditions and flight planning tools
           </p>
         </div>
-        <div className="text-right">
+
+        {/* Quick Stats Cards */}
+        <div className="flex items-center gap-4 flex-1">
+          <div className="aviation-card p-4 flex-1">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-aviation-100 rounded-lg">
+                <Plane className="h-5 w-5 text-aviation-600" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-600">Recent Flights</p>
+                <p className="text-xl font-bold text-slate-900">{recentFlights.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="aviation-card p-4 flex-1">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <CloudRain className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-600">Monitored Airports</p>
+                <p className="text-xl font-bold text-slate-900">{quickWeather.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="aviation-card p-4 flex-1">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-600">Active Alerts</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {quickWeather.filter(w => w.severity.level !== 'normal').length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Last Updated */}
+        <div className="flex-shrink-0 text-right">
           <div className="text-sm text-slate-500">Last updated</div>
           <div className="text-lg font-semibold text-slate-900">
             {new Date().toLocaleTimeString()}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="aviation-card p-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-aviation-100 rounded-lg">
-              <Plane className="h-6 w-6 text-aviation-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-600">Recent Flights</p>
-              <p className="text-2xl font-bold text-slate-900">{recentFlights.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="aviation-card p-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CloudRain className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-600">Monitored Airports</p>
-              <p className="text-2xl font-bold text-slate-900">{quickWeather.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="aviation-card p-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-600">Active Alerts</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {quickWeather.filter(w => w.severity.level !== 'normal').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="aviation-card p-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Clock className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-600">System Status</p>
-              <p className="text-lg font-semibold text-green-600">Online</p>
-            </div>
           </div>
         </div>
       </div>
@@ -217,7 +208,20 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Recent Flights */}
+          {/* Flight Map - Now below Current Weather */}
+          <FlightMap 
+            airports={quickWeather}
+            height="300px"
+          />
+        </div>
+
+        {/* Right Sidebar */}
+        <div className="space-y-6">
+          <AlertsPanel 
+            alerts={quickWeather.filter(w => w.severity.level !== 'normal')}
+          />
+          
+          {/* Recent Flights - Now in place of FlightMap */}
           <div className="aviation-card p-6">
             <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center">
               <MapPin className="h-5 w-5 mr-2 text-slate-600" />
@@ -235,35 +239,7 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* Alerts Panel */}
-        <div className="space-y-6">
-          <AlertsPanel 
-            alerts={quickWeather.filter(w => w.severity.level !== 'normal')}
-          />
           
-          {/* Flight Map */}
-          <FlightMap 
-            airports={quickWeather}
-            height="300px"
-          />
-          
-          {/* Quick Actions */}
-          <div className="aviation-card p-6">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h2>
-            <div className="space-y-3">
-              <button className="w-full bg-aviation-600 text-white px-4 py-3 rounded-lg hover:bg-aviation-700 transition-colors font-medium">
-                New Flight Briefing
-              </button>
-              <button className="w-full bg-slate-100 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-200 transition-colors font-medium">
-                Decode METAR/TAF
-              </button>
-              <button className="w-full bg-slate-100 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-200 transition-colors font-medium">
-                Weather Trends
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
