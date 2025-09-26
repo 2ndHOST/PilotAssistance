@@ -3,17 +3,6 @@ import { ArrowLeft, Compass } from 'lucide-react'
 import TrendAnalysis from './TrendAnalysis'
 
 const WindDirectionFrequencyAnalysis = () => {
-  const simulateData = ({ airport, period, interval }) => (
-    (() => {
-      const seed = (airport || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-      const mult = period === '30d' ? 1.1 : period === '14d' ? 1.05 : 1
-      const dirs = ['N','NE','E','SE','S','SW','W','NW']
-      const base = [8,12,6,4,10,15,20,25].map((v, i) => Math.round(v * mult + ((seed + i) % 3) - 1))
-      const sum = base.reduce((a,b)=>a+b,0)
-      // Normalize to 100
-      return dirs.map((dir, i) => ({ dir, freq: Math.round(base[i] * 100 / sum) }))
-    })()
-  )
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
@@ -35,12 +24,11 @@ const WindDirectionFrequencyAnalysis = () => {
 
       <TrendAnalysis
         title="Wind Direction Frequency"
-        description=""
+        description="Analyze wind direction patterns and frequency distributions using real METAR data."
         chartType="radar"
         yUnitLabel="%"
         xKey="dir"
         dataKey="freq"
-        simulateData={simulateData}
       />
     </div>
   )

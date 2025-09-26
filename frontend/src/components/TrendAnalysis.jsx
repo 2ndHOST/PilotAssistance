@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { fetchHistoricalWeather, generateMockHistoricalData, getWindDirectionCategory, calculateTrend } from '../services/weatherApiService'
 
 const defaultStats = { average: null, max: null, min: null, trend: '—' }
 
@@ -34,24 +35,122 @@ const TrendAnalysis = ({
   const [interval, setInterval] = useState('hourly')
   const [data, setData] = useState([])
   const [renderKey, setRenderKey] = useState(0)
-  const stats = useMemo(() => computeStats(data.map(d => Number(d[dataKey]) || 0)), [data, dataKey])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const stats = useMemo(() => {
+    const values = data.map(d => Number(d[dataKey]) || 0)
+    const computed = computeStats(values)
+    
+    // Use the new trend calculation function
+    if (values.length > 0) {
+      computed.trend = calculateTrend(values)
+    }
+    
+    return computed
+  }, [data, dataKey])
 
-  const handleGenerate = (e) => {
+  const isValidICAO = (code) => {
+    return /^[A-Z]{4}$/.test(code.toUpperCase())
+  }
+
+  const handleGenerate = async (e) => {
     e.preventDefault()
-    const generated = simulateData ? simulateData({ airport, period, interval }) : []
-    // Always update state with a new reference and bump key to force remount of the chart
-    setData(Array.isArray(generated) ? [...generated] : generated)
-    setRenderKey((k) => k + 1)
+    setError('')
+    
+    if (!isValidICAO(airport)) {
+      setError('Please enter a valid 4-letter ICAO airport code (e.g., KJFK, EGLL, VABB)')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Try to fetch real weather data first
+      let weatherData
+      try {
+        weatherData = await fetchHistoricalWeather(airport.toUpperCase(), period)
+      } catch (apiError) {
+        console.warn('API not available, using mock data:', apiError)
+        weatherData = generateMockHistoricalData(airport.toUpperCase(), period)
+      }
+
+      // Process the data based on chart type
+      let processedData = []
+      
+      if (chartType === 'line') {
+        // For line charts (temperature, wind speed)
+        processedData = weatherData.map((item, index) => {
+          const time = new Date(item.timestamp).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+          })
+          
+          if (dataKey === 'value') {
+            // Temperature or wind speed
+            const value = item.parsed?.temperature || item.parsed?.windSpeed || 0
+            return { time, value, airport: airport.toUpperCase() }
+          }
+          return { time, [dataKey]: item.parsed?.[dataKey] || 0, airport: airport.toUpperCase() }
+        })
+      } else if (chartType === 'pie') {
+        // For pie charts (condition severity)
+        const conditionCounts = {}
+        weatherData.forEach(item => {
+          const condition = item.parsed?.condition || 'VFR'
+          conditionCounts[condition] = (conditionCounts[condition] || 0) + 1
+        })
+        
+        const total = Object.values(conditionCounts).reduce((sum, count) => sum + count, 0)
+        processedData = Object.entries(conditionCounts).map(([name, count]) => ({
+          name,
+          value: Math.round((count / total) * 100 * 10) / 10,
+          airport: airport.toUpperCase()
+        }))
+      } else if (chartType === 'radar') {
+        // For radar charts (wind direction frequency)
+        const directionCounts = {}
+        weatherData.forEach(item => {
+          const direction = getWindDirectionCategory(item.parsed?.windDirection)
+          directionCounts[direction] = (directionCounts[direction] || 0) + 1
+        })
+        
+        const total = Object.values(directionCounts).reduce((sum, count) => sum + count, 0)
+        processedData = Object.entries(directionCounts).map(([dir, count]) => ({
+          dir,
+          freq: Math.round((count / total) * 100),
+          airport: airport.toUpperCase()
+        }))
+      }
+
+      setData(processedData)
+      setRenderKey((k) => k + 1)
+    } catch (err) {
+      console.error('Error generating analysis:', err)
+      setError('Failed to generate analysis. Please check the airport code and try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderChart = () => {
+    if (loading) {
+      return (
+        <div className="h-64 flex items-center justify-center text-slate-400 text-sm text-center">
+          <div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <div>Generating analysis...</div>
+          </div>
+        </div>
+      )
+    }
+
     if (!data || data.length === 0) {
       return (
         <div className="h-64 flex items-center justify-center text-slate-400 text-sm text-center">
           <div>
             <div className="text-3xl mb-2">⋯</div>
             <div>Chart will appear here</div>
-            <div className="text-xs mt-1">Configure settings and click "Generate Analysis"</div>
+            <div className="text-xs mt-1">Enter a valid ICAO code and click "Generate Analysis"</div>
           </div>
         </div>
       )
@@ -125,7 +224,20 @@ const TrendAnalysis = ({
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Airport Code</label>
-              <input value={airport} onChange={(e) => setAirport(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="e.g., KJFK" />
+              <input 
+                value={airport} 
+                onChange={(e) => setAirport(e.target.value.toUpperCase())} 
+                className={`w-full border rounded-lg px-3 py-2 ${
+                  airport && !isValidICAO(airport) 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500'
+                }`} 
+                placeholder="e.g., KJFK" 
+                maxLength={4}
+              />
+              {airport && !isValidICAO(airport) && (
+                <p className="text-xs text-red-500 mt-1">Enter a valid 4-letter ICAO code</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Time Period</label>
@@ -142,7 +254,23 @@ const TrendAnalysis = ({
                 <option value="daily">Daily</option>
               </select>
             </div>
-            <button type="button" onClick={handleGenerate} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg">Generate Analysis</button>
+            <button 
+              type="button" 
+              onClick={handleGenerate} 
+              disabled={!isValidICAO(airport) || loading}
+              className={`w-full font-medium py-2 rounded-lg transition-all ${
+                !isValidICAO(airport) || loading
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {loading ? 'Generating...' : 'Generate Analysis'}
+            </button>
+            {error && (
+              <div className="text-xs text-red-500 mt-2 p-2 bg-red-50 rounded-lg">
+                {error}
+              </div>
+            )}
           </div>
         </div>
 
