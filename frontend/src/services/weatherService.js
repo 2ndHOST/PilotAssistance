@@ -244,6 +244,24 @@ class WeatherService {
     }
   }
 
+  /**
+   * Get winds aloft along a route
+   * @param {Object} params - { origin, destination, flightLevel, numPoints }
+   */
+  async getWindsAloft({ origin, destination, flightLevel, numPoints = 8 }) {
+    try {
+      const response = await this.client.post('/weather/winds', {
+        origin: String(origin).toUpperCase(),
+        destination: String(destination).toUpperCase(),
+        flightLevel,
+        numPoints
+      })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
   // Airport search for typeahead
   async searchAirports(q) {
     try {
@@ -355,6 +373,7 @@ export const {
   getFlightBriefing, 
   getQuickBriefing, 
   getDemoBriefing, 
+  getWindsAloft,
   getVoiceBriefing,
   checkHealth,
   getCacheStats,

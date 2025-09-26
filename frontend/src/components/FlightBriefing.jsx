@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plane, MapPin, AlertTriangle, Download } from 'lucide-react'
 import weatherService from '../services/weatherService'
 import WeatherCard from './WeatherCard'
@@ -8,6 +8,7 @@ import TTSControls from './TTSControls'
 const FlightBriefing = () => {
   const [briefingData, setBriefingData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [winds, setWinds] = useState(null)
   const [route, setRoute] = useState({
     origin: '',
     destination: '',
@@ -32,6 +33,28 @@ const FlightBriefing = () => {
       setLoading(false)
     }
   }
+
+  // Fetch winds aloft after briefing loads successfully
+  useEffect(() => {
+    const fetchWinds = async () => {
+      try {
+        if (!briefingData?.route?.origin || !briefingData?.route?.destination) return
+        const wl = await weatherService.getWindsAloft({
+          origin: briefingData.route.origin,
+          destination: briefingData.route.destination,
+          flightLevel: briefingData.route.flightLevel,
+          numPoints: 8
+        })
+        setWinds(wl)
+      } catch (err) {
+        console.warn('Failed to fetch winds aloft:', err?.message || err)
+        setWinds(null)
+      }
+    }
+    if (briefingData && !briefingData.error) {
+      fetchWinds()
+    }
+  }, [briefingData])
 
   const getSeverityColor = (level) => {
     switch (level) {
@@ -351,6 +374,37 @@ const FlightBriefing = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Winds Aloft */}
+                {winds?.success && Array.isArray(winds.points) && winds.points.length > 0 && (
+                  <div className="max-w-6xl mx-auto mt-8">
+                    <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-5">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow">
+                          <Plane className="h-5 w-5 text-white" />
+                        </div>
+                        <h2 className="text-lg font-bold text-slate-900">Winds Aloft {briefingData.route?.flightLevel ? `(near ${briefingData.route.flightLevel})` : ''}</h2>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {winds.points.map((pt, idx) => (
+                          <div key={idx} className="bg-white/50 rounded-xl p-4 border border-white/30">
+                            <div className="text-slate-700 text-sm mb-1">
+                              Point {idx + 1} • {pt.lat != null && pt.lon != null ? `${Number(pt.lat).toFixed ? Number(pt.lat).toFixed(2) : pt.lat}, ${Number(pt.lon).toFixed ? Number(pt.lon).toFixed(2) : pt.lon}` : 'N/A'}
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              {pt.windSpeedKt != null ? `${Number(pt.windSpeedKt).toFixed ? Number(pt.windSpeedKt).toFixed(0) : pt.windSpeedKt} kt` : '—'}
+                              {pt.windDirDeg != null ? ` @ ${Math.round(pt.windDirDeg)}°` : ''}
+                              {pt.temperatureC != null ? ` • ${pt.temperatureC}°C` : ''}
+                            </div>
+                            {pt.pressureLevelHpa && (
+                              <div className="text-[10px] text-slate-500 mt-1">Level: {pt.pressureLevelHpa} hPa</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Flight Map */}
                 <div className="max-w-6xl mx-auto mt-8">
@@ -365,6 +419,7 @@ const FlightBriefing = () => {
                         lon: data.airport?.lon
                       }))}
                       enroutePoints={briefingData.routeWeather?.points || []}
+                      windPoints={winds?.points || []}
                       height="500px"
                     />
                   </div>

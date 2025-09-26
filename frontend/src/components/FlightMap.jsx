@@ -10,7 +10,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 })
 
-const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' }) => {
+const FlightMap = ({ route, airports = [], enroutePoints = [], windPoints = [], height = '400px' }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
@@ -116,9 +116,9 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
 
     const map = mapInstanceRef.current
     
-    // Clear existing layers
+    // Clear existing non-tile layers before re-rendering
     map.eachLayer((layer) => {
-      if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+      if (!(layer instanceof L.TileLayer)) {
         map.removeLayer(layer)
       }
     })
@@ -277,13 +277,52 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
       })
     }
 
+    // Plot winds aloft arrows/summaries
+    if (windPoints && windPoints.length > 0) {
+      windPoints.forEach((pt, idx) => {
+        if (pt.lat != null && pt.lon != null) {
+          const coords = [Number(pt.lat), Number(pt.lon)]
+          const dir = Number.isFinite(Number(pt.windDirDeg)) ? Math.round(Number(pt.windDirDeg)) : null
+          const speed = Number.isFinite(Number(pt.windSpeedKt)) ? Math.round(Number(pt.windSpeedKt)) : null
+
+          const html = `
+            <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4)); transform: rotate(${dir != null ? dir : 0}deg);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3 L15 9 L12 7 L9 9 Z" fill="#0ea5e9"/>
+                <rect x="11" y="7" width="2" height="12" fill="#0ea5e9"/>
+              </svg>
+            </div>
+          `
+
+          const windMarker = L.marker(coords, {
+            icon: L.divIcon({
+              html,
+              className: 'wind-arrow-marker',
+              iconSize: [28, 28],
+              iconAnchor: [14, 14]
+            })
+          })
+          .bindPopup(`
+            <div class="text-xs">
+              <div class="font-semibold">Winds Aloft ${idx + 1}</div>
+              <div class="text-slate-600">${speed != null ? `${speed} kt` : '—'}${dir != null ? ` @ ${dir}°` : ''}${pt.temperatureC != null ? ` • ${pt.temperatureC}°C` : ''}</div>
+              ${pt.pressureLevelHpa ? `<div class="text-slate-500">Level: ${pt.pressureLevelHpa} hPa</div>` : ''}
+            </div>
+          `)
+          .addTo(map)
+
+          markers.push(windMarker)
+        }
+      })
+    }
+
     // Fit map to show all markers
     if (markers.length > 0) {
       const group = new L.featureGroup(markers)
       map.fitBounds(group.getBounds().pad(0.1))
     }
 
-  }, [route, airports, enroutePoints])
+  }, [route, airports, enroutePoints, windPoints])
 
   return (
     <div className="aviation-card overflow-hidden">

@@ -556,6 +556,76 @@ class WeatherService {
     return results;
   }
 
+  /**
+   * Get winds aloft along route using Open-Meteo pressure-level hourly data
+   */
+  async getWindsAlongRoute(start, end, numPoints = 8, flightLevel) {
+    const points = this.sampleGreatCircle(start, end, numPoints);
+    const hPa = this.flightLevelToHpa(flightLevel) || 300; // default 300 hPa ~ FL300
+    const results = [];
+    for (const pt of points) {
+      try {
+        const ow = await this.fetchOpenMeteoWinds(pt.lat, pt.lon, hPa);
+        const windSpeedKt = ow?.windSpeedMs != null ? Number(ow.windSpeedMs) * 1.94384 : null;
+        results.push({
+          lat: pt.lat,
+          lon: pt.lon,
+          pressureLevelHpa: hPa,
+          windSpeedKt: windSpeedKt != null ? Number(windSpeedKt.toFixed ? windSpeedKt.toFixed(1) : windSpeedKt) : null,
+          windDirDeg: ow?.windDirDeg ?? null,
+          temperatureC: ow?.temperatureC ?? null,
+          time: ow?.time || null
+        });
+      } catch (e) {
+        results.push({ lat: pt.lat, lon: pt.lon, pressureLevelHpa: hPa, windSpeedKt: null, windDirDeg: null, temperatureC: null, time: null });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Convert Flight Level to approximate pressure level in hPa
+   * Simple mapping sufficient for visualization
+   */
+  flightLevelToHpa(fl) {
+    const feet = this.flightLevelToFeet(fl);
+    if (!feet) return null;
+    const flNum = feet / 100; // FL in hundreds of feet
+    if (flNum >= 430) return 150; // ~ FL430 -> 150 hPa
+    if (flNum >= 380) return 200; // FL380-420
+    if (flNum >= 330) return 250; // FL330-370
+    if (flNum >= 280) return 300; // FL280-320
+    if (flNum >= 240) return 350;
+    if (flNum >= 200) return 400;
+    return 500; // lower
+  }
+
+  /**
+   * Fetch winds for given lat/lon at a pressure level from Open-Meteo
+   */
+  async fetchOpenMeteoWinds(lat, lon, hPa) {
+    const params = [
+      `latitude=${encodeURIComponent(lat)}`,
+      `longitude=${encodeURIComponent(lon)}`,
+      `hourly=windspeed_${hPa}hPa,winddirection_${hPa}hPa,temperature_${hPa}hPa`,
+      `timezone=UTC`
+    ].join('&');
+    const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+    const resp = await axios.get(url, { timeout: 12000, headers: { 'User-Agent': 'PilotAssistant/1.0' } });
+    const hourly = resp.data?.hourly;
+    if (!hourly || !hourly.time || !hourly[`windspeed_${hPa}hPa`]) {
+      throw new Error('Open-Meteo response missing hourly winds');
+    }
+    // Pick the first hour (current/next). Optionally choose closest to now.
+    const idx = 0;
+    return {
+      time: hourly.time[idx],
+      windSpeedMs: hourly[`windspeed_${hPa}hPa`][idx],
+      windDirDeg: hourly[`winddirection_${hPa}hPa`][idx],
+      temperatureC: hourly[`temperature_${hPa}hPa`]?.[idx] ?? null
+    };
+  }
+
   flightLevelToFeet(fl) {
     if (!fl) return null;
     const m = String(fl).toUpperCase().match(/FL?(\d{2,3})/);

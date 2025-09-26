@@ -11,7 +11,6 @@ const weatherService = new WeatherService();
 router.post('/decode', async (req, res) => {
   try {
     const { text, type } = req.body;
-    
     if (!text) {
       return res.status(400).json({
         error: 'Missing required field: text',
@@ -45,6 +44,43 @@ router.post('/decode', async (req, res) => {
       error: 'Failed to decode weather data',
       message: error.message
     });
+  }
+});
+
+/**
+ * POST /api/weather/winds
+ * Get winds aloft along a route
+ * Body: { origin, destination, flightLevel, numPoints? }
+ */
+router.post('/winds', async (req, res) => {
+  try {
+    const { origin, destination, flightLevel, numPoints = 8 } = req.body || {};
+
+    if (!origin || !destination) {
+      return res.status(400).json({ error: 'Missing origin/destination', message: 'Provide origin and destination ICAO codes' });
+    }
+
+    // Resolve airport coordinates
+    const [orig, dest] = await Promise.all([
+      weatherService.getAirportDetails(String(origin).toUpperCase()),
+      weatherService.getAirportDetails(String(destination).toUpperCase())
+    ]);
+
+    if (orig?.lat == null || orig?.lon == null || dest?.lat == null || dest?.lon == null) {
+      return res.status(400).json({ error: 'Missing coordinates', message: 'Could not resolve airport coordinates' });
+    }
+
+    const winds = await weatherService.getWindsAlongRoute(
+      { lat: Number(orig.lat), lon: Number(orig.lon) },
+      { lat: Number(dest.lat), lon: Number(dest.lon) },
+      Math.max(2, Math.min(50, Number(numPoints) || 8)),
+      flightLevel
+    );
+
+    res.json({ success: true, origin: String(origin).toUpperCase(), destination: String(destination).toUpperCase(), flightLevel, points: winds, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Winds aloft fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch winds aloft', message: error.message });
   }
 });
 
