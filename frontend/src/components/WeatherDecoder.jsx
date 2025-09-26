@@ -3,9 +3,9 @@ import { Cloud, Copy, Download, FileText, AlertCircle, CheckCircle, Loader2, Spa
 import weatherService from '../services/weatherService'
 import WeatherCard from './WeatherCard'
 
-const WeatherDecoder = () => {
+const WeatherDecoder = ({ initialType = 'metar' }) => {
   const [input, setInput] = useState('')
-  const [type, setType] = useState('metar')
+  const [type, setType] = useState((initialType === 'taf' ? 'taf' : 'metar'))
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
