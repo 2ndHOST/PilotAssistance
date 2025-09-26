@@ -4,17 +4,30 @@ const API_BASE_URL = 'http://localhost:3001/api'
 
 class WeatherService {
   constructor() {
+    // Create axios instance with default config
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 10000,
+      timeout: 15000, // Increased timeout
       headers: {
         'Content-Type': 'application/json'
+      },
+      retry: 3, // Number of retries
+      retryDelay: 1000, // Delay between retries in ms
+      retryCondition: (error) => {
+        // Retry on network errors or 5xx responses
+        return (
+          !error.response || 
+          (error.code === 'ECONNABORTED') || 
+          (error.code === 'ERR_NETWORK') ||
+          (error.response.status >= 500 && error.response.status < 600)
+        )
       }
     })
 
     // Request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
+        config.metadata = { startTime: new Date() }
         console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.url}`)
         return config
       },
@@ -24,15 +37,47 @@ class WeatherService {
       }
     )
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling and retry logic
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`✅ API Response: ${response.status} ${response.config.url}`)
+        const endTime = new Date()
+        const duration = endTime - response.config.metadata?.startTime
+        console.log(`✅ API Response (${duration}ms): ${response.status} ${response.config.url}`)
         return response
       },
-      (error) => {
-        console.error('❌ API Response Error:', error.response?.data || error.message)
-        return Promise.reject(this.handleApiError(error))
+      async (error) => {
+        const config = error.config
+        
+        // If no config or retry option not set, reject
+        if (!config || !config.retry) {
+          console.error('❌ API Error (no retry):', error.message)
+          return Promise.reject(this.handleApiError(error))
+        }
+        
+        // Set retry count if not set
+        config.__retryCount = config.__retryCount || 0
+        
+        // Check if we've maxed out retries or if the error is not retryable
+        if (config.__retryCount >= config.retry) {
+          console.error(`❌ Max retries (${config.retry}) exceeded for ${config.url}`)
+          return Promise.reject(this.handleApiError(error))
+        }
+        
+        // Increase retry count
+        config.__retryCount += 1
+        
+        // Calculate retry delay with exponential backoff
+        const delay = config.retryDelay * Math.pow(2, config.__retryCount - 1)
+        
+        console.log(`🔄 Retry attempt ${config.__retryCount} for ${config.url} in ${delay}ms...`)
+        
+        // Create new promise to handle retry after delay
+        return new Promise(resolve => {
+          setTimeout(() => {
+            console.log(`🔄 Retrying request (${config.__retryCount}/${config.retry}) to ${config.url}`)
+            resolve(this.client(config))
+          }, delay)
+        })
       }
     )
   }
@@ -129,9 +174,12 @@ class WeatherService {
   }
 
   /**
-   * Get comprehensive flight briefing
+   * Get comprehensive flight briefing with retry logic
+   * @param {Object} route - The flight route details
+   * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+   * @returns {Promise<Object>} Flight briefing data
    */
-  async getFlightBriefing(route) {
+  async getFlightBriefing(route, maxRetries = 3) {
     try {
       const response = await this.client.post('/briefing', {
         origin: route.origin.toUpperCase(),
@@ -141,10 +189,32 @@ class WeatherService {
         plannedArrival: route.plannedArrival,
         aircraft: route.aircraft,
         flightLevel: route.flightLevel
-      })
-      return response.data
+      }, {
+        retry: maxRetries,
+        retryDelay: 1000, // 1 second initial delay
+        'axios-retry': {
+          retries: maxRetries,
+          retryDelay: (retryCount) => {
+            const delay = 1000 * Math.pow(2, retryCount - 1);
+            console.log(`Retry attempt ${retryCount}, waiting ${delay}ms...`);
+            return delay;
+          },
+          retryCondition: (error) => {
+            // Retry on network errors or 5xx responses
+            return (
+              !error.response || 
+              error.code === 'ECONNABORTED' || 
+              error.code === 'ERR_NETWORK' ||
+              (error.response.status >= 500 && error.response.status < 600)
+            );
+          }
+        }
+      });
+      
+      return response.data;
     } catch (error) {
-      throw error
+      console.error('Failed to fetch flight briefing after retries:', error);
+      throw this.handleApiError(error);
     }
   }
 
