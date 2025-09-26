@@ -210,6 +210,30 @@ class WeatherService {
   }
 
   /**
+   * Get current flight summary
+   */
+  async getCurrentFlight() {
+    try {
+      const response = await this.client.get('/flight/current')
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
+   * Get recent flights list
+   */
+  async getRecentFlights() {
+    try {
+      const response = await this.client.get('/flight/recent')
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
    * Check API health
    */
   async checkHealth() {

@@ -1,5 +1,6 @@
 const express = require('express');
 const WeatherService = require('../services/weatherService');
+const { updateFromBriefing } = require('../services/flightStore');
 
 const router = express.Router();
 const weatherService = new WeatherService();
@@ -73,6 +74,9 @@ router.post('/', async (req, res) => {
 
     // Get comprehensive briefing (includes airport details and enroute weather when available)
     const briefing = await weatherService.getFlightBriefing(flightRoute);
+
+    // Update in-memory flight store for current/recent endpoints
+    updateFromBriefing(briefing);
 
     // Add voice briefing text
     briefing.voiceBriefing = generateVoiceBriefing(briefing);
@@ -226,6 +230,9 @@ router.get('/demo', async (req, res) => {
 
     const briefing = await weatherService.getFlightBriefing(demoRoute);
     briefing.voiceBriefing = generateVoiceBriefing(briefing);
+
+    // Update store for demo as well so UI can reflect current flight
+    updateFromBriefing(briefing);
 
     res.json({
       success: true,
