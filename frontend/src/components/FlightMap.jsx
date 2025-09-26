@@ -10,25 +10,15 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 })
 
-const FlightMap = ({ route, airports = [], height = '400px' }) => {
+const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
-  // Airport coordinates (sample data - in real app this would come from database)
-  const airportCoordinates = {
-    'KJFK': [40.6413, -73.7781],
-    'KLAX': [33.9425, -118.4081],
-    'KORD': [41.9796, -87.9045],
-    'KLGA': [40.7769, -73.8740],
-    'KBOS': [42.3656, -71.0096],
-    'KSEA': [47.4502, -122.3088],
-    'KDEN': [39.8561, -104.6737],
-    'EGLL': [51.4700, -0.4543],
-    'LFPG': [49.0128, 2.5500],
-    'KMIA': [25.7959, -80.2870],
-    'VIPA': [28.5562, 77.1000], // Delhi area
-    'VAPP': [19.0887, 72.8681], // Mumbai area
-    'VIDP': [28.5562, 77.1000]  // Delhi Indira Gandhi International
+  // Get coords for an ICAO from airports prop (each item can include lat/lon)
+  const getCoordsForIcao = (icao) => {
+    const a = airports.find(x => x.icao === icao && x.lat != null && x.lon != null)
+    if (!a) return null
+    return [Number(a.lat), Number(a.lon)]
   }
 
   const getSeverityColor = (severity) => {
@@ -113,7 +103,7 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     const routeCoordinates = []
 
     // Add origin marker
-    const originCoords = airportCoordinates[route.origin]
+    const originCoords = getCoordsForIcao(route.origin)
     if (originCoords) {
       const originMarker = L.marker(originCoords, {
         icon: createCustomIcon('normal', true, false)
@@ -133,7 +123,7 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     }
 
     // Add destination marker
-    const destCoords = airportCoordinates[route.destination]
+    const destCoords = getCoordsForIcao(route.destination)
     if (destCoords) {
       const destMarker = L.marker(destCoords, {
         icon: createCustomIcon('normal', false, true)
@@ -155,8 +145,8 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     // Add alternate airports
     if (route.alternates && route.alternates.length > 0) {
       route.alternates.forEach(alt => {
-        if (alt && airportCoordinates[alt]) {
-          const altCoords = airportCoordinates[alt]
+        const altCoords = getCoordsForIcao(alt)
+        if (alt && altCoords) {
           const altMarker = L.marker(altCoords, {
             icon: createCustomIcon('caution')
           })
@@ -176,7 +166,7 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     // Add airports with weather data
     if (airports && airports.length > 0) {
       airports.forEach(airport => {
-        const coords = airportCoordinates[airport.icao]
+        const coords = (airport.lat != null && airport.lon != null) ? [Number(airport.lat), Number(airport.lon)] : null
         if (coords && !routeCoordinates.some(coord => coord[0] === coords[0] && coord[1] === coords[1])) {
           const marker = L.marker(coords, {
             icon: createCustomIcon(airport.severity?.level || 'normal')
@@ -237,13 +227,37 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
       console.warn('Not enough coordinates to draw flight path:', routeCoordinates.length)
     }
 
+    // Plot enroute sampled points with nearest METAR summaries
+    if (enroutePoints && enroutePoints.length > 0) {
+      enroutePoints.forEach((pt, idx) => {
+        if (pt.lat != null && pt.lon != null) {
+          const pcoords = [Number(pt.lat), Number(pt.lon)]
+          const marker = L.circleMarker(pcoords, {
+            radius: 5,
+            color: '#6366f1',
+            fillColor: '#6366f1',
+            fillOpacity: 0.8
+          })
+          .bindPopup(`
+            <div class="text-xs max-w-xs">
+              <div class="font-semibold mb-1">Enroute sample ${idx + 1}</div>
+              ${pt.nearestStation ? `<div class="text-slate-600">Nearest: ${pt.nearestStation}${pt.distanceNm ? ` • ${Number(pt.distanceNm).toFixed(1)} NM` : ''}</div>` : ''}
+              ${pt.metarSummary ? `<div class="mt-1 text-slate-700">${pt.metarSummary}</div>` : '<div class="text-slate-500">No data</div>'}
+            </div>
+          `)
+          .addTo(map)
+          markers.push(marker)
+        }
+      })
+    }
+
     // Fit map to show all markers
     if (markers.length > 0) {
       const group = new L.featureGroup(markers)
       map.fitBounds(group.getBounds().pad(0.1))
     }
 
-  }, [route, airports])
+  }, [route, airports, enroutePoints])
 
   return (
     <div className="aviation-card overflow-hidden">

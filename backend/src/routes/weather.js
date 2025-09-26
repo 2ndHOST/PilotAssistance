@@ -251,4 +251,38 @@ router.delete('/cache', (req, res) => {
   }
 });
 
+/**
+ * GET /api/weather/airports/search?q=...
+ * Search airports by name/ICAO/IATA for typeahead
+ */
+router.get('/airports/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || String(q).trim().length < 2) {
+      return res.status(400).json({ error: 'Invalid query', message: 'Provide at least 2 characters' });
+    }
+    const results = await weatherService.searchAirports(q);
+    res.json({ success: true, results, count: results.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to search airports', message: error.message });
+  }
+});
+
+/**
+ * GET /api/weather/airports/:icao
+ * Get single airport details
+ */
+router.get('/airports/:icao', async (req, res) => {
+  try {
+    const { icao } = req.params;
+    if (!icao || icao.length !== 4) {
+      return res.status(400).json({ error: 'Invalid ICAO code', message: 'ICAO must be 4 letters' });
+    }
+    const airport = await weatherService.getAirportDetails(icao.toUpperCase());
+    res.json({ success: true, airport });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch airport', message: error.message });
+  }
+});
+
 module.exports = router;

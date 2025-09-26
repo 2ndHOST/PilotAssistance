@@ -27,15 +27,15 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate ICAO codes
-    const validateIcao = (icao, field) => {
-      if (typeof icao !== 'string' || icao.length !== 4) {
-        throw new Error(`Invalid ${field} ICAO code: must be 4 characters`);
+    // Validate ICAO string format first
+    const validateIcaoFormat = (icao, field) => {
+      if (typeof icao !== 'string' || icao.length !== 4 || /[^A-Za-z0-9]/.test(icao)) {
+        throw new Error(`Invalid ${field} ICAO code: must be 4 alphanumeric characters`);
       }
     };
 
-    validateIcao(origin, 'origin');
-    validateIcao(destination, 'destination');
+    validateIcaoFormat(origin, 'origin');
+    validateIcaoFormat(destination, 'destination');
 
     if (alternates) {
       if (!Array.isArray(alternates)) {
@@ -44,7 +44,7 @@ router.post('/', async (req, res) => {
           message: 'Alternates must be an array of ICAO codes'
         });
       }
-      alternates.forEach((alt, index) => validateIcao(alt, `alternate ${index + 1}`));
+      alternates.forEach((alt, index) => validateIcaoFormat(alt, `alternate ${index + 1}`));
     }
 
     // Create route object
@@ -59,7 +59,19 @@ router.post('/', async (req, res) => {
       flightLevel: req.body.flightLevel
     };
 
-    // Get comprehensive briefing
+    // Strict airport existence validation using lookup API
+    try {
+      await Promise.all([
+        weatherService.getAirportDetails(flightRoute.origin),
+        weatherService.getAirportDetails(flightRoute.destination),
+        ...flightRoute.alternates.map(alt => weatherService.getAirportDetails(alt))
+      ]);
+    } catch (e) {
+      const msg = e?.message || 'Airport lookup failed';
+      return res.status(400).json({ error: 'Invalid ICAO code', message: msg });
+    }
+
+    // Get comprehensive briefing (includes airport details and enroute weather when available)
     const briefing = await weatherService.getFlightBriefing(flightRoute);
 
     // Add voice briefing text
