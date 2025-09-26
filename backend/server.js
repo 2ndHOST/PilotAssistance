@@ -5,6 +5,7 @@ require('dotenv').config();
 const weatherRoutes = require('./src/routes/weather');
 const briefingRoutes = require('./src/routes/briefing');
 const WeatherService = require('./src/services/weatherService');
+const flightRoutes = require('./src/routes/flight');
 
 // Initialize weather service
 const weatherService = new WeatherService();
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/weather', weatherRoutes);
 app.use('/api/briefing', briefingRoutes);
+app.use('/api/flight', flightRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

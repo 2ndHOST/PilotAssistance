@@ -14,6 +14,32 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
+  const getAirportName = (icao) => {
+    const airportNames = {
+      'VOBL': 'Bangalore',
+      'VABB': 'Mumbai', 
+      'VECC': 'Kolkata',
+      'VIDP': 'Delhi',
+      'VOMM': 'Chennai',
+      'VAGO': 'Goa',
+      'VOCB': 'Coimbatore',
+      'VOTV': 'Thiruvananthapuram',
+      'VOPB': 'Port Blair',
+      'VEGT': 'Guwahati',
+      'KJFK': 'New York JFK',
+      'KLAX': 'Los Angeles',
+      'KORD': 'Chicago O\'Hare',
+      'KDEN': 'Denver',
+      'KBOS': 'Boston',
+      'KSEA': 'Seattle',
+      'KDFW': 'Dallas Fort Worth',
+      'KATL': 'Atlanta',
+      'KMIA': 'Miami',
+      'KLAS': 'Las Vegas'
+    }
+    return airportNames[icao] || icao
+  }
+
   // Get coords for an ICAO from airports prop (each item can include lat/lon)
   const getCoordsForIcao = (icao) => {
     const a = airports.find(x => x.icao === icao && x.lat != null && x.lon != null)
@@ -261,7 +287,7 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
 
   return (
     <div className="aviation-card overflow-hidden">
-      <div className="p-4 border-b border-slate-200">
+      <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10">
         <h3 className="text-lg font-semibold text-slate-900 flex items-center">
           <svg className="h-5 w-5 mr-2 text-slate-600" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
@@ -269,14 +295,24 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
           Flight Route Map
         </h3>
         {route && route.origin && route.destination && (
-          <p className="text-sm text-slate-600 mt-1">
-            {route.origin} → {route.destination}
+          <div className="mt-2">
+            <div className="flex items-center justify-center space-x-4 text-sm">
+              <div className="text-center">
+                <div className="font-semibold text-slate-900">{route.origin}</div>
+                <div className="text-xs text-slate-500">{getAirportName(route.origin)}</div>
+              </div>
+              <div className="text-slate-400">→</div>
+              <div className="text-center">
+                <div className="font-semibold text-slate-900">{route.destination}</div>
+                <div className="text-xs text-slate-500">{getAirportName(route.destination)}</div>
+              </div>
+            </div>
             {route.alternates && route.alternates.filter(alt => alt).length > 0 && (
-              <span className="ml-2 text-slate-500">
-                (Alternates: {route.alternates.filter(alt => alt).join(', ')})
-              </span>
+              <div className="mt-2 text-xs text-slate-500 text-center">
+                Alternates: {route.alternates.filter(alt => alt).join(', ')}
+              </div>
             )}
-          </p>
+          </div>
         )}
       </div>
       
