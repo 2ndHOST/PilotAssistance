@@ -24,7 +24,11 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     'KSEA': [47.4502, -122.3088],
     'KDEN': [39.8561, -104.6737],
     'EGLL': [51.4700, -0.4543],
-    'LFPG': [49.0128, 2.5500]
+    'LFPG': [49.0128, 2.5500],
+    'KMIA': [25.7959, -80.2870],
+    'VIPA': [28.5562, 77.1000], // Delhi area
+    'VAPP': [19.0887, 72.8681], // Mumbai area
+    'VIDP': [28.5562, 77.1000]  // Delhi Indira Gandhi International
   }
 
   const getSeverityColor = (severity) => {
@@ -124,6 +128,8 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
       
       markers.push(originMarker)
       routeCoordinates.push(originCoords)
+    } else {
+      console.warn(`No coordinates found for origin airport: ${route.origin}`)
     }
 
     // Add destination marker
@@ -142,6 +148,8 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
       
       markers.push(destMarker)
       routeCoordinates.push(destCoords)
+    } else {
+      console.warn(`No coordinates found for destination airport: ${route.destination}`)
     }
 
     // Add alternate airports
@@ -188,12 +196,14 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
     }
 
     // Draw flight path
-    if (routeCoordinates.length === 2) {
+    if (routeCoordinates.length >= 2) {
+      console.log('Drawing flight path between:', routeCoordinates)
+      
       const flightPath = L.polyline(routeCoordinates, {
         color: '#0ea5e9',
-        weight: 3,
-        opacity: 0.8,
-        dashArray: '10, 10'
+        weight: 4,
+        opacity: 0.9,
+        dashArray: '15, 10'
       }).addTo(map)
       
       // Add arrow to show direction
@@ -204,12 +214,27 @@ const FlightMap = ({ route, airports = [], height = '400px' }) => {
       
       L.marker(midpoint, {
         icon: L.divIcon({
-          html: '<div style="font-size: 20px;">✈️</div>',
+          html: '<div style="font-size: 24px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">✈️</div>',
           className: 'flight-direction-marker',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10]
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
         })
       }).addTo(map)
+      
+      // Add distance information
+      const distance = map.distance(routeCoordinates[0], routeCoordinates[1])
+      const distanceKm = Math.round(distance / 1000)
+      
+      L.marker(midpoint, {
+        icon: L.divIcon({
+          html: `<div style="background: rgba(14, 165, 233, 0.9); color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap;">${distanceKm} km</div>`,
+          className: 'flight-distance-marker',
+          iconSize: [60, 20],
+          iconAnchor: [30, 10]
+        })
+      }).addTo(map)
+    } else {
+      console.warn('Not enough coordinates to draw flight path:', routeCoordinates.length)
     }
 
     // Fit map to show all markers

@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "setup-api": "node setup-api.js",
+    "setup-real-apis": "node setup-real-apis.js",
+    "fix-apis": "node fix-apis.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

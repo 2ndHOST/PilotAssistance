@@ -4,6 +4,10 @@ require('dotenv').config();
 
 const weatherRoutes = require('./src/routes/weather');
 const briefingRoutes = require('./src/routes/briefing');
+const WeatherService = require('./src/services/weatherService');
+
+// Initialize weather service
+const weatherService = new WeatherService();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +28,26 @@ app.get('/health', (req, res) => {
     message: 'Weather Assistant API is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// API health check
+app.get('/api/health', async (req, res) => {
+  try {
+    const apiHealth = await weatherService.checkApiHealth();
+    res.json({
+      status: 'OK',
+      message: 'Weather API health check completed',
+      timestamp: new Date().toISOString(),
+      apis: apiHealth
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Failed to check API health',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Error handling middleware

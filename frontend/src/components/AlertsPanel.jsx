@@ -5,8 +5,18 @@ const AlertsPanel = ({ alerts = [] }) => {
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set())
   const [muteAlerts, setMuteAlerts] = useState(false)
 
-  const activeAlerts = alerts.filter(alert => 
-    !dismissedAlerts.has(alert.icao) && alert.severity.level !== 'normal'
+  // Ensure alerts is an array and filter out any invalid entries
+  const validAlerts = Array.isArray(alerts) ? alerts.filter(alert => 
+    alert && typeof alert === 'object' && alert.icao
+  ) : []
+
+  const activeAlerts = validAlerts.filter(alert => 
+    alert && 
+    alert.icao && 
+    !dismissedAlerts.has(alert.icao) && 
+    alert.severity && 
+    alert.severity.level && 
+    alert.severity.level !== 'normal'
   )
 
   const dismissAlert = (icao) => {
@@ -68,27 +78,27 @@ const AlertsPanel = ({ alerts = [] }) => {
           activeAlerts.map((alert) => (
             <div
               key={alert.icao}
-              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity.level)}`}
+              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity?.level || 'normal')}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-xl">{alert.severity.emoji}</span>
+                    <span className="text-xl">{alert.severity?.emoji || '⚠️'}</span>
                     <div>
                       <h3 className="font-semibold text-sm">
-                        {getSeverityTitle(alert.severity.level)}
+                        {getSeverityTitle(alert.severity?.level || 'normal')}
                       </h3>
                       <p className="text-xs opacity-70">Airport: {alert.icao}</p>
                     </div>
                   </div>
                   
                   <p className="text-sm leading-relaxed mb-2">
-                    {alert.conditions}
+                    {alert.conditions || alert.message || 'No details available'}
                   </p>
                   
                   <div className="flex items-center justify-between text-xs opacity-70">
-                    <span>Updated {alert.updated}</span>
-                    {alert.severity.level === 'critical' && (
+                    <span>Updated {alert.updated || 'Unknown'}</span>
+                    {alert.severity?.level === 'critical' && (
                       <span className="bg-red-200 text-red-800 px-2 py-1 rounded font-medium">
                         IMMEDIATE ATTENTION
                       </span>
