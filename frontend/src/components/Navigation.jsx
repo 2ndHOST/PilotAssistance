@@ -7,8 +7,8 @@ const Navigation = () => {
   const [showQuickActions, setShowQuickActions] = useState(false)
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: Activity },
-    { path: '/briefing', label: 'Flight Briefing', icon: Plane },
+    { path: '/flight-briefing', label: 'Dashboard', icon: Plane },
+    { path: '/dashboard', label: 'Flight Briefing', icon: Activity },
     { path: '/decoder', label: 'Weather Decoder', icon: Cloud },
     { path: '/charts', label: 'Weather Trends', icon: TrendingUp },
   ]
