@@ -40,7 +40,7 @@ const AlertsPanel = ({ alerts = [] }) => {
   }
 
   return (
-    <div className="aviation-card p-6">
+    <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900 flex items-center">
           <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
@@ -78,7 +78,7 @@ const AlertsPanel = ({ alerts = [] }) => {
           activeAlerts.map((alert) => (
             <div
               key={alert.icao}
-              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity?.level || 'normal')}`}
+              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity?.level || 'normal')} shadow-xs`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">

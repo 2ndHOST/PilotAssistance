@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Plane, CloudRain, AlertTriangle, Clock, MapPin, Wind, Search, X } from 'lucide-react'
 import WeatherCard from './WeatherCard'
@@ -10,6 +11,7 @@ const Dashboard = () => {
   const [recentFlights, setRecentFlights] = useState([])
   const [quickWeather, setQuickWeather] = useState([])
   const [loading, setLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState(new Date())
   const [flightSearchTerm, setFlightSearchTerm] = useState('')
   const [showFlightSearch, setShowFlightSearch] = useState(false)
 
@@ -84,6 +86,7 @@ const Dashboard = () => {
           },
         ])
       } finally {
+        setLastUpdated(new Date())
         setLoading(false)
       }
     }
@@ -126,8 +129,16 @@ const Dashboard = () => {
     )
   }
 
+  const minutesAgo = Math.max(0, Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000))
+
+  const primaryFlight = recentFlights[0] || null
+  const departureIcao = primaryFlight ? primaryFlight.origin : '—'
+  const destinationIcao = primaryFlight ? primaryFlight.destination : '—'
+  const plannedFlightTime = primaryFlight ? primaryFlight.time : '—'
+  const plannedDistance = '—'
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-[#F8F9FB]">
       {/* Header with Stats in One Line */}
       <div className="flex items-center justify-between gap-6">
         {/* Pilot Dashboard Title */}
@@ -138,42 +149,50 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Quick Stats Cards */}
+        {/* Quick Summary Cards (Flight Briefing Top) */}
         <div className="flex items-center gap-4 flex-1">
-          <div className="aviation-card p-4 flex-1">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-aviation-100 rounded-lg">
-                <Plane className="h-5 w-5 text-aviation-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Recent Flights</p>
-                <p className="text-xl font-bold text-slate-900">{recentFlights.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="aviation-card p-4 flex-1">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CloudRain className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Monitored Airports</p>
-                <p className="text-xl font-bold text-slate-900">{quickWeather.length}</p>
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 flex-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-aviation-100 rounded-lg">
+                  <Plane className="h-5 w-5 text-aviation-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Departure</p>
+                  <p className="text-xl font-bold text-slate-900">{departureIcao}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="aviation-card p-4 flex-1">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 flex-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Destination</p>
+                  <p className="text-xl font-bold text-slate-900">{destinationIcao}</p>
+                </div>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 flex-1">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">Active Alerts</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {quickWeather.filter(w => w.severity.level !== 'normal').length}
-                </p>
+                <p className="text-sm text-slate-600">Flight Time</p>
+                <p className="text-xl font-bold text-slate-900">{plannedFlightTime}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 flex-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Distance</p>
+                <p className="text-xl font-bold text-slate-900">{plannedDistance}</p>
               </div>
             </div>
           </div>
@@ -188,54 +207,22 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Main Content Grid */}
+      {/* Map + Right Sidebar (Alerts + Flight Plan Details) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weather Conditions */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="aviation-card p-6">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center">
-              <Wind className="h-5 w-5 mr-2 text-slate-600" />
-              Current Weather Conditions
-            </h2>
-            <div className="space-y-4">
-              {quickWeather.map((weather) => (
-                <div 
-                  key={weather.icao}
-                  className={`p-4 rounded-lg border ${getSeverityColor(weather.severity.level)}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{weather.severity.emoji}</span>
-                      <div>
-                        <h3 className="font-semibold text-lg">{weather.icao}</h3>
-                        <p className="text-sm opacity-90">{weather.conditions}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <TTSControls 
-                        text={`${weather.icao}: ${weather.conditions}`}
-                        size="small"
-                        className="relative"
-                      />
-                      <div className="text-right text-xs opacity-70">
-                        Updated {weather.updated}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Central Map */}
+        <div className="lg:col-span-2">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4">
+            <FlightMap 
+              airports={quickWeather}
+              height="360px"
+            />
+            <div className="mt-2 text-xs text-slate-500">Updated {minutesAgo} min ago</div>
           </div>
-
-          {/* Flight Map - Now below Current Weather */}
-          <FlightMap 
-            airports={quickWeather}
-            height="300px"
-          />
         </div>
 
         {/* Right Sidebar */}
         <div className="space-y-6">
+          {/* Weather Alerts Along Route */}
           <AlertsPanel 
             alerts={quickWeather
               .filter(w => w.severity && w.severity.level && w.severity.level !== 'normal')
@@ -247,13 +234,13 @@ const Dashboard = () => {
               }))
             }
           />
-          
-          {/* Recent Flights - Now in place of FlightMap */}
-          <div className="aviation-card p-6">
+
+          {/* Flight Plan Details Sidebar */}
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-slate-900 flex items-center">
                 <MapPin className="h-5 w-5 mr-2 text-slate-600" />
-                Recent Flight Plans
+                Flight Plan Details
               </h2>
               <button
                 onClick={() => setShowFlightSearch(!showFlightSearch)}
@@ -264,7 +251,6 @@ const Dashboard = () => {
               </button>
             </div>
 
-            {/* Search Input */}
             {showFlightSearch && (
               <div className="mb-4 relative">
                 <div className="relative">
@@ -293,10 +279,11 @@ const Dashboard = () => {
               </div>
             )}
 
+            <div className="text-xs text-slate-500 mb-2">Updated {minutesAgo} min ago</div>
             <div className="space-y-3">
               {filteredFlights.length > 0 ? (
                 filteredFlights.map((flight) => (
-                  <div key={flight.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                  <div key={flight.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition-shadow">
                     <div className="flex items-center space-x-3">
                       <Plane className="h-4 w-4 text-slate-500" />
                       <div>
@@ -325,7 +312,65 @@ const Dashboard = () => {
               )}
             </div>
           </div>
-          
+        </div>
+      </div>
+
+      {/* Flight Route Weather Summary */}
+      <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Flight Route Weather Summary</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {['Departure','Enroute','Arrival'].map((label, idx) => {
+            const w = quickWeather[idx] || quickWeather[0] || { icao: '—', conditions: '—', severity: { level: 'unknown', emoji: '⚪' }, updated: '—' }
+            return (
+              <div key={label} className={`p-4 rounded-lg border ${getSeverityColor(w.severity.level)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-slate-700">{label}</div>
+                  <div className="text-xs text-slate-500">{w.updated}</div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">{w.severity.emoji}</span>
+                  <div>
+                    <div className="text-lg font-semibold text-slate-900">{w.icao}</div>
+                    <div className="text-sm text-slate-600">{w.conditions}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Altitude Layer Weather */}
+      <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Altitude Layer Weather</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {['FL180','FL240','FL300','FL360'].map((level, i) => {
+            const ref = quickWeather[i % (quickWeather.length || 1)] || quickWeather[0] || { severity: { level: 'unknown' } }
+            return (
+              <div key={level} className="p-4 bg-white border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-slate-700">{level}</div>
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    ref.severity.level === 'critical' ? 'bg-red-500' :
+                    ref.severity.level === 'caution' ? 'bg-yellow-400' :
+                    ref.severity.level === 'normal' ? 'bg-green-500' : 'bg-slate-300'
+                  }`}></span>
+                </div>
+                <div className="text-sm text-slate-600">
+                  Temp: —°C
+                </div>
+                <div className="text-sm text-slate-600">
+                  Wind: — kt
+                </div>
+                <div className="text-sm text-slate-600">
+                  Conditions: —
+                </div>
+                <div className="text-sm text-slate-600">
+                  Turbulence: {ref.severity.level === 'critical' ? 'Severe' : ref.severity.level === 'caution' ? 'Moderate' : 'Light'}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
