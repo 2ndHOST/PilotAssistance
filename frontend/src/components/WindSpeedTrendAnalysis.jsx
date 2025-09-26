@@ -3,16 +3,6 @@ import { ArrowLeft, Wind } from 'lucide-react'
 import TrendAnalysis from './TrendAnalysis'
 
 const WindSpeedTrendAnalysis = () => {
-  const simulateData = ({ airport, period, interval }) => {
-    const seed = (airport || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-    const times = ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00']
-    const periodFactor = period === '30d' ? 1.4 : period === '14d' ? 1.2 : 1.0
-    const intervalFactor = interval === 'daily' ? 0.9 : 1.0
-    return times.map((t, i) => ({
-      time: t,
-      value: Math.round((8 + Math.abs(Math.sin((i + (seed % 7)) / 1.3)) * 12 * periodFactor * intervalFactor) * 10) / 10
-    }))
-  }
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
@@ -34,12 +24,11 @@ const WindSpeedTrendAnalysis = () => {
 
       <TrendAnalysis
         title="Wind Speed Trend"
-        description=""
+        description="Track wind speed variations and patterns using real METAR data."
         chartType="line"
         yUnitLabel="kt"
         xKey="time"
         dataKey="value"
-        simulateData={simulateData}
       />
     </div>
   )

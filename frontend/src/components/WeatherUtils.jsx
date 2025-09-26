@@ -1,52 +1,139 @@
 import { Link } from 'react-router-dom'
-import { Cloud, ChevronRight } from 'lucide-react'
+import { Cloud, FileText, Thermometer, Wind, Gauge, Compass, Zap, LineChart, Sparkles } from 'lucide-react'
 
-const LinkItem = ({ to, label, color = 'blue' }) => (
+const CardHeader = ({ title }) => (
+  <div className="px-6 py-4 border-b border-slate-100">
+    <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+  </div>
+)
+
+const SectionCard = ({ children }) => (
+  <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+    {children}
+  </div>
+)
+
+const ItemCard = ({ to, icon: Icon, title, subtitle, accent = 'blue' }) => (
   <Link
     to={to}
-    className={`group flex items-center justify-between w-full px-4 py-3 rounded-xl border bg-white/80 hover:bg-white transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-[1px] border-slate-200`}
+    className={`group flex items-start gap-3 rounded-xl border border-slate-200 p-4 bg-white hover:bg-slate-50 hover:shadow-sm transition-all duration-200 no-underline hover:no-underline`}
   >
-    <span className="font-medium text-slate-700 group-hover:text-slate-900">{label}</span>
-    <ChevronRight className={`h-4 w-4 text-${color}-500 group-hover:translate-x-0.5 transition-transform`} />
+    <div className={`h-10 w-10 rounded-xl bg-${accent}-100 text-${accent}-600 flex items-center justify-center shadow-sm`}> 
+      <Icon className="h-5 w-5" />
+    </div>
+    <div className="flex-1">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900 no-underline">{title}</h3>
+      </div>
+      <p className="text-sm text-slate-500 mt-0.5 underline">{subtitle}</p>
+    </div>
   </Link>
 )
 
 const WeatherUtils = () => {
   return (
-    <div className="min-h-[60vh]">
-      {/* Top Icon */}
-      <div className="flex justify-center mb-4">
-        <div className="h-12 w-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow">
-          <Cloud className="h-6 w-6" />
-        </div>
+    <div className="w-full">
+      {/* Title */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-slate-900">Weather Analysis Suite</h1>
+        <p className="text-slate-500 mt-2 max-w-2xl mx-auto">Quickly access decoders and trend analyses with a clean, modern layout.</p>
       </div>
 
-      {/* Title & Subtitle */}
-      <div className="text-center space-y-2 mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Weather Analysis Suite</h1>
-        <p className="text-slate-500 max-w-2xl mx-auto">Quickly access weather decoders and trend analyses</p>
+      {/* Two-column main cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Decoder */}
+        <SectionCard>
+          <CardHeader title="Weather Decoder" />
+          <div className="p-6 grid sm:grid-cols-1 gap-4">
+            <ItemCard
+              to="/metar-decoder"
+              icon={Cloud}
+              title="METAR"
+              subtitle="Meteorological Aerodrome Report"
+              accent="blue"
+            />
+            <ItemCard
+              to="/taf-decoder"
+              icon={FileText}
+              title="TAF"
+              subtitle="Terminal Aerodrome Forecast"
+              accent="violet"
+            />
+          </div>
+        </SectionCard>
+
+        {/* Trends */}
+        <SectionCard>
+          <CardHeader title="Weather Trends" />
+          <div className="p-6 grid sm:grid-cols-1 gap-4">
+            <ItemCard
+              to="/temperature-trend-analysis"
+              icon={Thermometer}
+              title="Temperature Trend"
+              subtitle="Visualize temperature over time"
+              accent="rose"
+            />
+            <ItemCard
+              to="/wind-speed-trend-analysis"
+              icon={Wind}
+              title="Wind Speed Trend"
+              subtitle="Analyze wind speed variations"
+              accent="sky"
+            />
+            <ItemCard
+              to="/condition-severity-distribution"
+              icon={Gauge}
+              title="Condition Severity"
+              subtitle="Distribution of flight condition severity"
+              accent="amber"
+            />
+            <ItemCard
+              to="/wind-direction-frequency-analysis"
+              icon={Compass}
+              title="Wind Direction"
+              subtitle="Frequency by direction"
+              accent="purple"
+            />
+          </div>
+        </SectionCard>
       </div>
 
-      {/* Unified Card */}
-      <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-xl p-6 md:p-8 max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Weather Decoder Section */}
-          <div className="bg-gradient-to-b from-slate-50 to-white rounded-xl border border-slate-200 p-5">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Weather Decoder</h2>
-            <div className="grid gap-2">
-              <LinkItem to="/metar-decoder" label="METAR" color="blue" />
-              <LinkItem to="/taf-decoder" label="TAF" color="violet" />
+      {/* Bottom feature row */}
+      <div className="mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition-all">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900">Real-time Data</h3>
+                <p className="text-sm text-slate-500">Up-to-date aviation weather with smart fallbacks.</p>
+              </div>
             </div>
           </div>
 
-          {/* Weather Trends Section */}
-          <div className="bg-gradient-to-b from-slate-50 to-white rounded-xl border border-slate-200 p-5">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Weather Trends</h2>
-            <div className="grid gap-2">
-              <LinkItem to="/temperature-trend-analysis" label="Temperature Trend" color="rose" />
-              <LinkItem to="/wind-speed-trend-analysis" label="Wind Speed Trend" color="sky" />
-              <LinkItem to="/condition-severity-distribution" label="Condition Severity Distribution" color="amber" />
-              <LinkItem to="/wind-direction-frequency-analysis" label="Wind Direction Frequency" color="purple" />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition-all">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                <LineChart className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900">Advanced Analytics</h3>
+                <p className="text-sm text-slate-500">Trends and summaries for informed planning.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition-all">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900">Instant Decoding</h3>
+                <p className="text-sm text-slate-500">Readable insights from raw METAR/TAF reports.</p>
+              </div>
             </div>
           </div>
         </div>

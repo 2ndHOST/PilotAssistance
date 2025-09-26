@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Cloud, Copy, Download, FileText, AlertCircle, CheckCircle, Loader2, Sparkles } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Cloud, Copy, Download, FileText, AlertCircle, CheckCircle, Loader2, Sparkles, ArrowLeft } from 'lucide-react'
 import weatherService from '../services/weatherService'
 import WeatherCard from './WeatherCard'
 
@@ -38,6 +39,13 @@ const WeatherDecoder = ({ initialType = 'metar' }) => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-16">
+      {/* Back to Weather Utils */}
+      <div className="mb-2">
+        <Link to="/weather-utils" className="inline-flex items-center text-slate-600 hover:text-slate-900">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Weather Utils
+        </Link>
+      </div>
       {/* Header Section */}
       <div className="text-center space-y-6">
         <h1 className="text-5xl font-bold text-slate-800">
