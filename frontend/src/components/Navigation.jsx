@@ -9,8 +9,7 @@ const Navigation = () => {
   const navItems = [
     { path: '/flight-briefing', label: 'Dashboard', icon: Plane },
     { path: '/dashboard', label: 'Flight Briefing', icon: Activity },
-    { path: '/decoder', label: 'Weather Decoder', icon: Cloud },
-    { path: '/charts', label: 'Weather Trends', icon: TrendingUp },
+    { path: '/weather-utils', label: 'Weather Utils', icon: BarChart3 },
   ]
 
   const quickActions = [
