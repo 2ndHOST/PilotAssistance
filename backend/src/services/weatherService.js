@@ -14,6 +14,8 @@ class WeatherService {
     this.avwxBaseUrl = process.env.AVWX_BASE_URL || 'https://avwx.rest/api';
     this.checkwxApiKey = process.env.CHECKWX_API_KEY;
     this.checkwxBaseUrl = process.env.CHECKWX_BASE_URL || 'https://api.checkwx.com/v1';
+    this.aeroDataBoxApiKey = process.env.AERODATABOX_API_KEY;
+    this.aeroDataBoxBaseUrl = process.env.AERODATABOX_BASE_URL || 'https://aerodatabox.p.rapidapi.com';
     
     // Log API configuration status
     this.logApiStatus();
@@ -369,30 +371,28 @@ class WeatherService {
           criticalAlerts: [],
           recommendations: []
         },
+        routeWeather: { points: [] },
         timestamp: new Date().toISOString()
       };
 
-      // Fetch weather data for all airports in parallel
+      // Fetch airport details and weather data for all airports in parallel
       const weatherPromises = airports.map(async (icao) => {
-        const [metar, taf, notams] = await Promise.all([
+        const [airport, metar, taf, notams] = await Promise.all([
+          this.getAirportDetails(icao).catch(() => null),
           this.getMetar(icao),
           this.getTaf(icao),
           this.getNotams(icao)
         ]);
 
-        return {
-          icao,
-          metar,
-          taf,
-          notams
-        };
+        return { icao, airport, metar, taf, notams };
       });
 
       const airportData = await Promise.all(weatherPromises);
 
       // Process each airport's data
-      airportData.forEach(({ icao, metar, taf, notams }) => {
+      airportData.forEach(({ icao, airport, metar, taf, notams }) => {
         briefing.airports[icao] = {
+          airport,
           metar,
           taf,
           notams,
@@ -424,6 +424,30 @@ class WeatherService {
         });
       });
 
+      // Build enroute weather points when we have valid origin/destination coordinates
+      try {
+        const originAirport = briefing.airports[route.origin]?.airport;
+        const destAirport = briefing.airports[route.destination]?.airport;
+        if (originAirport?.lat != null && originAirport?.lon != null && destAirport?.lat != null && destAirport?.lon != null) {
+          const samples = await this.getEnrouteWeatherPoints(
+            { lat: Number(originAirport.lat), lon: Number(originAirport.lon) },
+            { lat: Number(destAirport.lat), lon: Number(destAirport.lon) },
+            8,
+            route.flightLevel
+          );
+          briefing.routeWeather.points = samples;
+
+          // Consider enroute severities in worstSeverity
+          samples.forEach(pt => {
+            if (pt.metar?.success && this.parser.compareSeverity(pt.metar.severity.level, briefing.summary.worstSeverity) > 0) {
+              briefing.summary.worstSeverity = pt.metar.severity.level;
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Enroute weather computation failed:', e.message);
+      }
+
       // Generate recommendations
       briefing.summary.recommendations = this.generateRecommendations(briefing);
 
@@ -431,6 +455,239 @@ class WeatherService {
     } catch (error) {
       throw new Error(`Failed to generate flight briefing: ${error.message}`);
     }
+  }
+
+  /**
+   * Airport details lookup with AVWX primary, CheckWX fallback, AeroDataBox optional
+   */
+  async getAirportDetails(icao) {
+    const cacheKey = `airport_${icao}`;
+    if (this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.cacheTimeout) {
+        return cached.data;
+      }
+    }
+
+    let details = null;
+    const upper = icao.toUpperCase();
+    try {
+      // AVWX Station endpoint
+      if (this.avwxApiKey && !this.failedAPIs.has('avwx')) {
+        details = await this.fetchAirportFromAVWX(upper);
+      }
+    } catch (e) {
+      // continue to fallback
+    }
+    if (!details) {
+      try {
+        if (this.checkwxApiKey && !this.failedAPIs.has('checkwx')) {
+          details = await this.fetchAirportFromCheckWX(upper);
+        }
+      } catch (e) {}
+    }
+    if (!details) {
+      try {
+        if (this.aeroDataBoxApiKey) {
+          details = await this.fetchAirportFromAeroDataBox(upper);
+        }
+      } catch (e) {}
+    }
+
+    if (!details) {
+      throw new Error(`Airport ${upper} not found`);
+    }
+
+    this.cache.set(cacheKey, { data: details, timestamp: Date.now() });
+    return details;
+  }
+
+  /** Search airports for typeahead */
+  async searchAirports(query) {
+    const q = String(query).trim();
+    if (!q) return [];
+    // Try AeroDataBox search first (good coverage)
+    try {
+      if (this.aeroDataBoxApiKey) {
+        return await this.searchAirportsAeroDataBox(q);
+      }
+    } catch (_) {}
+    try {
+      if (this.checkwxApiKey) {
+        return await this.searchAirportsCheckWX(q);
+      }
+    } catch (_) {}
+    // Minimal fallback: if looks like ICAO, just return that
+    if (/^[A-Za-z]{4}$/.test(q)) {
+      try {
+        const a = await this.getAirportDetails(q.toUpperCase());
+        return [a];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  /**
+   * Compute enroute sample points and fetch nearest METAR for each
+   */
+  async getEnrouteWeatherPoints(start, end, numPoints = 8, flightLevel) {
+    const points = this.sampleGreatCircle(start, end, numPoints);
+    const results = [];
+    for (const pt of points) {
+      try {
+        const nearest = await this.fetchNearestMetar(pt.lat, pt.lon);
+        const raw = typeof nearest === 'string' ? nearest : nearest?.raw || nearest?.metar || nearest?.text;
+        const metar = raw ? this.parser.parseMetar(raw) : null;
+        results.push({
+          lat: pt.lat,
+          lon: pt.lon,
+          altitudeFt: this.flightLevelToFeet(flightLevel),
+          nearestStation: nearest?.station || (metar?.parsed?.station) || nearest?.icao || null,
+          distanceNm: nearest?.distanceNm || nearest?.distance || null,
+          metarSummary: metar?.decoded?.summary || null,
+          metar
+        });
+      } catch (e) {
+        results.push({ lat: pt.lat, lon: pt.lon, altitudeFt: this.flightLevelToFeet(flightLevel), metarSummary: null });
+      }
+    }
+    return results;
+  }
+
+  flightLevelToFeet(fl) {
+    if (!fl) return null;
+    const m = String(fl).toUpperCase().match(/FL?(\d{2,3})/);
+    if (m) return Number(m[1]) * 100;
+    const n = Number(fl);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  sampleGreatCircle(start, end, numPoints) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const lat1 = toRad(start.lat);
+    const lon1 = toRad(start.lon);
+    const lat2 = toRad(end.lat);
+    const lon2 = toRad(end.lon);
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2));
+    if (d === 0) return [start];
+    const points = [];
+    for (let i = 1; i <= numPoints; i++) {
+      const f = i / (numPoints + 1);
+      const A = Math.sin((1 - f) * d) / Math.sin(d);
+      const B = Math.sin(f * d) / Math.sin(d);
+      const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+      const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+      const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+      const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+      const lon = Math.atan2(y, x);
+      points.push({ lat: toDeg(lat), lon: toDeg(lon) });
+    }
+    return points;
+  }
+
+  async fetchNearestMetar(lat, lon) {
+    // Prefer AVWX nearby if available, otherwise CheckWX lat/lon
+    if (this.avwxApiKey && !this.failedAPIs.has('avwx')) {
+      try {
+        const url = `${this.avwxBaseUrl}/metar/${lat},${lon}?n=1`;
+        const resp = await axios.get(url, {
+          headers: { 'Authorization': `BEARER ${this.avwxApiKey}`, 'User-Agent': 'PilotAssistant/1.0' },
+          timeout: 10000
+        });
+        if (resp.data && resp.data.raw) {
+          return { raw: resp.data.raw, station: resp.data.station };
+        }
+      } catch (e) {
+        // continue to fallback
+      }
+    }
+    if (this.checkwxApiKey && !this.failedAPIs.has('checkwx')) {
+      const url = `${this.checkwxBaseUrl}/metar/lat/${lat}/lon/${lon}?limit=1`;
+      const resp = await axios.get(url, { headers: { 'X-API-Key': this.checkwxApiKey, 'User-Agent': 'PilotAssistant/1.0' }, timeout: 10000 });
+      if (resp.data?.data?.length) {
+        const d = resp.data.data[0];
+        return { raw: typeof d === 'string' ? d : d.raw_text || d, station: d.icao || d.station }; 
+      }
+    }
+    // As a last resort, return null
+    return null;
+  }
+
+  // -------- Airport provider helpers --------
+  async fetchAirportFromAVWX(icao) {
+    const url = `${this.avwxBaseUrl}/station/${icao}`;
+    const resp = await axios.get(url, { headers: { 'Authorization': `BEARER ${this.avwxApiKey}`, 'User-Agent': 'PilotAssistant/1.0' }, timeout: 10000 });
+    const d = resp.data || {};
+    return {
+      icao,
+      name: d.name || d.city || null,
+      country: d.country || d.country_code || null,
+      lat: d.latitude || d.lat,
+      lon: d.longitude || d.lon,
+      elevationFt: d.elevation_ft || d.elevation || null,
+      iata: d.iata || null
+    };
+  }
+
+  async fetchAirportFromCheckWX(icao) {
+    const url = `${this.checkwxBaseUrl}/airport/${icao}`;
+    const resp = await axios.get(url, { headers: { 'X-API-Key': this.checkwxApiKey, 'User-Agent': 'PilotAssistant/1.0' }, timeout: 10000 });
+    const d = resp.data?.data?.[0] || {};
+    return {
+      icao,
+      name: d.name || null,
+      country: d.country?.name || d.country || null,
+      lat: d.latitude || d.position?.latitude,
+      lon: d.longitude || d.position?.longitude,
+      elevationFt: d.elevation?.feet || d.elevation_feet || null,
+      iata: d.iata || null
+    };
+  }
+
+  async fetchAirportFromAeroDataBox(icao) {
+    const url = `${this.aeroDataBoxBaseUrl}/airports/icao/${icao}`;
+    const resp = await axios.get(url, { headers: { 'X-RapidAPI-Key': this.aeroDataBoxApiKey }, timeout: 12000 });
+    const d = resp.data || {};
+    return {
+      icao,
+      name: d.name || null,
+      country: d.country?.name || d.country || null,
+      lat: d.location?.lat || d.latitude,
+      lon: d.location?.lon || d.longitude,
+      elevationFt: d.fieldElevation?.ft || d.elevationFt || null,
+      iata: d.iata || d.iataCode || null
+    };
+  }
+
+  async searchAirportsAeroDataBox(q) {
+    const url = `${this.aeroDataBoxBaseUrl}/airports/search/term?q=${encodeURIComponent(q)}&limit=10`;
+    const resp = await axios.get(url, { headers: { 'X-RapidAPI-Key': this.aeroDataBoxApiKey }, timeout: 12000 });
+    return (resp.data?.items || []).map(it => ({
+      icao: it.icao || it.icaoCode,
+      name: it.name,
+      country: it.country?.name || it.country,
+      lat: it.location?.lat,
+      lon: it.location?.lon,
+      elevationFt: it.fieldElevation?.ft || null,
+      iata: it.iata || it.iataCode
+    })).filter(a => a.icao);
+  }
+
+  async searchAirportsCheckWX(q) {
+    const url = `${this.checkwxBaseUrl}/search/airport/${encodeURIComponent(q)}`;
+    const resp = await axios.get(url, { headers: { 'X-API-Key': this.checkwxApiKey, 'User-Agent': 'PilotAssistant/1.0' }, timeout: 10000 });
+    return (resp.data?.data || []).slice(0, 10).map(d => ({
+      icao: d.icao,
+      name: d.name,
+      country: d.country?.name || d.country,
+      lat: d.position?.latitude,
+      lon: d.position?.longitude,
+      elevationFt: d.elevation?.feet || null,
+      iata: d.iata
+    })).filter(a => a.icao);
   }
 
   /**

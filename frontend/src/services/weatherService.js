@@ -174,6 +174,26 @@ class WeatherService {
     }
   }
 
+  // Airport search for typeahead
+  async searchAirports(q) {
+    try {
+      const response = await this.client.get(`/weather/airports/search`, { params: { q } })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  // Airport details by ICAO
+  async getAirportDetails(icao) {
+    try {
+      const response = await this.client.get(`/weather/airports/${icao.toUpperCase()}`)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
   /**
    * Convert text to speech-ready format
    */
