@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Plane, CloudRain, AlertTriangle, Clock, MapPin, Wind, Search, X } from 'lucide-react'
 import WeatherCard from './WeatherCard'
 import FlightMap from './FlightMap'
@@ -10,90 +10,89 @@ import weatherService from '../services/weatherService'
 const Dashboard = () => {
   const [recentFlights, setRecentFlights] = useState([])
   const [quickWeather, setQuickWeather] = useState([])
-  const [currentFlight, setCurrentFlight] = useState(null)
-  const [altitudeWeather, setAltitudeWeather] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [flightSearchTerm, setFlightSearchTerm] = useState('')
   const [showFlightSearch, setShowFlightSearch] = useState(false)
 
+  // Sample data for demonstration
   useEffect(() => {
-    let timer
-    const seededRef = seededRefOuter.current
-    const load = async () => {
+    const loadDashboardData = async () => {
       try {
-        // Try fetching current & recent first
-        let [current, recent] = await Promise.all([
-          weatherService.getCurrentFlight(),
-          weatherService.getRecentFlights()
-        ])
-
-        // If no current flight yet, seed demo ONCE then refetch
-        if ((!current?.success || !current?.departure) && !seededRefOuter.current) {
-          try {
-            await weatherService.getDemoBriefing()
-            seededRefOuter.current = true
-            current = await weatherService.getCurrentFlight()
-            recent = await weatherService.getRecentFlights()
-          } catch {}
-        }
-
-        if (current?.success) {
-          setCurrentFlight(current)
-          
-          // Set altitude weather data from current flight
-          setAltitudeWeather(current.altitudeWeather || [])
-        }
+        // Check API health first
+        await weatherService.checkHealth()
         
-        if (recent?.success) {
-          const flights = (recent.flights || []).map((f, idx) => ({
-            id: f.id || `${idx}`,
-            origin: f.departure,
-            destination: f.destination,
-            time: formatTimeAgo(f.timestamp),
-            status: f.status || 'completed'
-          }))
-          setRecentFlights(flights)
-        }
-
-        // For map severity markers, use routeAirports when available
-        if (current?.routeAirports) {
-          const airports = current.routeAirports.map(a => ({
-            icao: a.icao,
-            lat: a.lat,
-            lon: a.lon,
-            conditions: a.conditions,
-            severity: a.severity
-          }))
-          setQuickWeather(airports)
-        }
-      } catch (e) {
-        console.error('Failed to load flight data', e)
+        // Load demo briefing data
+        const demoBriefing = await weatherService.getDemoBriefing()
+        
+        setRecentFlights([
+          { id: 1, origin: 'KJFK', destination: 'KLAX', time: '2 hours ago', status: 'completed' },
+          { id: 2, origin: 'KORD', destination: 'KDEN', time: '5 hours ago', status: 'completed' },
+          { id: 3, origin: 'KBOS', destination: 'KSEA', time: '1 day ago', status: 'completed' },
+        ])
+        
+        // Load quick weather for diverse airports to show different conditions
+        const airports = ['KJFK', 'KBOS', 'KORD']
+        const weatherPromises = airports.map(async (icao) => {
+          try {
+            const metar = await weatherService.getMetar(icao)
+            return {
+              icao,
+              conditions: metar.success ? metar.decoded.summary : 'Data unavailable',
+              severity: metar.success ? metar.severity : { level: 'unknown', emoji: '⚪' },
+              updated: metar.success ? 'Just now' : 'Unknown'
+            }
+          } catch (error) {
+            console.error(`Failed to load weather for ${icao}:`, error)
+            return {
+              icao,
+              conditions: 'Unable to load weather data',
+              severity: { level: 'unknown', emoji: '⚪' },
+              updated: 'Error'
+            }
+          }
+        })
+        
+        const weatherData = await Promise.all(weatherPromises)
+        setQuickWeather(weatherData)
+        
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error)
+        // Fallback to mock data
+        setRecentFlights([
+          { id: 1, origin: 'KJFK', destination: 'KLAX', time: '2 hours ago', status: 'completed' },
+          { id: 2, origin: 'KORD', destination: 'KDEN', time: '5 hours ago', status: 'completed' },
+          { id: 3, origin: 'KBOS', destination: 'KSEA', time: '1 day ago', status: 'completed' },
+        ])
+        
+        setQuickWeather([
+          { 
+            icao: 'KJFK', 
+            conditions: 'Wind 280° at 14G20kt, 10SM visibility, Few clouds at 25000ft',
+            severity: { level: 'normal', emoji: '🟢' },
+            updated: '5 min ago'
+          },
+          { 
+            icao: 'KBOS', 
+            conditions: 'Fog, 1/4SM visibility, Overcast at 200ft',
+            severity: { level: 'critical', emoji: '🔴' },
+            updated: '3 min ago'
+          },
+          { 
+            icao: 'KORD', 
+            conditions: 'Thunderstorms, 1/2SM visibility, Heavy rain',
+            severity: { level: 'critical', emoji: '🔴' },
+            updated: '1 min ago'
+          },
+        ])
       } finally {
         setLastUpdated(new Date())
         setLoading(false)
       }
     }
 
-    load()
-    timer = setInterval(load, 60 * 1000)
-    return () => clearInterval(timer)
+    loadDashboardData()
   }, [])
-
-  // local ref to avoid reseeding demo repeatedly
-  const seededRefOuter = useRef(false)
-
-  const formatTimeAgo = (ts) => {
-    if (!ts) return '—'
-    const diffMs = Date.now() - new Date(ts).getTime()
-    const mins = Math.floor(diffMs / 60000)
-    if (mins < 60) return `${mins} min ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs} hours ago`
-    const days = Math.floor(hrs / 24)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
-
 
   const getSeverityColor = (level) => {
     switch (level) {
@@ -116,9 +115,6 @@ const Dashboard = () => {
     )
   })
 
-  // Show at most three entries
-  const displayedFlights = filteredFlights.slice(0, 3)
-
   const clearSearch = () => {
     setFlightSearchTerm('')
     setShowFlightSearch(false)
@@ -135,13 +131,14 @@ const Dashboard = () => {
 
   const minutesAgo = Math.max(0, Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000))
 
-  const departureIcao = currentFlight?.departure || '—'
-  const destinationIcao = currentFlight?.destination || '—'
-  const plannedFlightTime = currentFlight?.flightTime || '—'
-  const plannedDistance = (currentFlight?.distanceKm != null) ? `${currentFlight.distanceKm} km` : '—'
+  const primaryFlight = recentFlights[0] || null
+  const departureIcao = primaryFlight ? primaryFlight.origin : '—'
+  const destinationIcao = primaryFlight ? primaryFlight.destination : '—'
+  const plannedFlightTime = primaryFlight ? primaryFlight.time : '—'
+  const plannedDistance = '—'
 
   return (
-    <div className="space-y-6 bg-[#F8F9FB] pt-6">
+    <div className="space-y-6 bg-[#F8F9FB]">
       {/* Header with Stats in One Line */}
       <div className="flex items-center justify-between gap-6">
         {/* Pilot Dashboard Title */}
@@ -213,10 +210,9 @@ const Dashboard = () => {
       {/* Map + Right Sidebar (Alerts + Flight Plan Details) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Central Map */}
-        <div className="lg:col-span-2 relative z-10">
-          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 relative">
+        <div className="lg:col-span-2">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4">
             <FlightMap 
-              route={{ origin: departureIcao, destination: destinationIcao, alternates: [] }}
               airports={quickWeather}
               height="360px"
             />
@@ -241,7 +237,7 @@ const Dashboard = () => {
 
           {/* Flight Plan Details Sidebar */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-10 pb-4">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-slate-900 flex items-center">
                 <MapPin className="h-5 w-5 mr-2 text-slate-600" />
                 Flight Plan Details
@@ -285,8 +281,8 @@ const Dashboard = () => {
 
             <div className="text-xs text-slate-500 mb-2">Updated {minutesAgo} min ago</div>
             <div className="space-y-3">
-              {displayedFlights.length > 0 ? (
-                displayedFlights.map((flight) => (
+              {filteredFlights.length > 0 ? (
+                filteredFlights.map((flight) => (
                   <div key={flight.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition-shadow">
                     <div className="flex items-center space-x-3">
                       <Plane className="h-4 w-4 text-slate-500" />
@@ -319,12 +315,9 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Spacing between sections */}
-      <div className="h-8"></div>
-
       {/* Flight Route Weather Summary */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
-        <h2 className="text-xl font-semibold text-slate-900 mb-4 sticky top-0 bg-white z-10 pb-4">Flight Route Weather Summary</h2>
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Flight Route Weather Summary</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {['Departure','Enroute','Arrival'].map((label, idx) => {
             const w = quickWeather[idx] || quickWeather[0] || { icao: '—', conditions: '—', severity: { level: 'unknown', emoji: '⚪' }, updated: '—' }
@@ -351,49 +344,33 @@ const Dashboard = () => {
       <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
         <h2 className="text-xl font-semibold text-slate-900 mb-4">Altitude Layer Weather</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {altitudeWeather.length > 0 ? altitudeWeather.map((alt, i) => (
-            <div key={alt.level} className="p-4 bg-white border border-slate-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-slate-700">{alt.level}</div>
-                <span className={`inline-block w-2 h-2 rounded-full ${
-                  alt.severity === 'critical' ? 'bg-red-500' :
-                  alt.severity === 'caution' ? 'bg-yellow-400' :
-                  alt.severity === 'normal' ? 'bg-green-500' : 'bg-slate-300'
-                }`}></span>
+          {['FL180','FL240','FL300','FL360'].map((level, i) => {
+            const ref = quickWeather[i % (quickWeather.length || 1)] || quickWeather[0] || { severity: { level: 'unknown' } }
+            return (
+              <div key={level} className="p-4 bg-white border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-slate-700">{level}</div>
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    ref.severity.level === 'critical' ? 'bg-red-500' :
+                    ref.severity.level === 'caution' ? 'bg-yellow-400' :
+                    ref.severity.level === 'normal' ? 'bg-green-500' : 'bg-slate-300'
+                  }`}></span>
+                </div>
+                <div className="text-sm text-slate-600">
+                  Temp: —°C
+                </div>
+                <div className="text-sm text-slate-600">
+                  Wind: — kt
+                </div>
+                <div className="text-sm text-slate-600">
+                  Conditions: —
+                </div>
+                <div className="text-sm text-slate-600">
+                  Turbulence: {ref.severity.level === 'critical' ? 'Severe' : ref.severity.level === 'caution' ? 'Moderate' : 'Light'}
+                </div>
               </div>
-              <div className="text-sm text-slate-600">
-                Temp: {alt.temperature}°C
-              </div>
-              <div className="text-sm text-slate-600">
-                Wind: {alt.wind}
-              </div>
-              <div className="text-sm text-slate-600">
-                Conditions: {alt.conditions}
-              </div>
-              <div className="text-sm text-slate-600">
-                Turbulence: {alt.turbulence}
-              </div>
-            </div>
-          )) : ['FL180','FL240','FL300','FL360'].map((level, i) => (
-            <div key={level} className="p-4 bg-white border border-slate-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-slate-700">{level}</div>
-                <span className="inline-block w-2 h-2 rounded-full bg-slate-300"></span>
-              </div>
-              <div className="text-sm text-slate-600">
-                Temp: —°C
-              </div>
-              <div className="text-sm text-slate-600">
-                Wind: — kt
-              </div>
-              <div className="text-sm text-slate-600">
-                Conditions: —
-              </div>
-              <div className="text-sm text-slate-600">
-                Turbulence: —
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

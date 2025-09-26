@@ -1,28 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plane, MapPin, AlertTriangle, Download } from 'lucide-react'
 import weatherService from '../services/weatherService'
 import WeatherCard from './WeatherCard'
 import FlightMap from './FlightMap'
 import AlertsPanel from './AlertsPanel'
 import TTSControls from './TTSControls'
+import { useFlightPlan } from '../context/FlightPlanContext'
+import { useNavigate } from 'react-router-dom'
+
 const FlightBriefing = () => {
   const [briefingData, setBriefingData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [winds, setWinds] = useState(null)
-  const [route, setRoute] = useState({
-    origin: '',
-    destination: '',
-    alternates: [''],
-    flightLevel: 'FL350'
-  })
+  const { flightPlan, setFlightPlan } = useFlightPlan()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     
     try {
-      const briefing = await weatherService.getFlightBriefing(route)
+      const briefing = await weatherService.getFlightBriefing(flightPlan)
       setBriefingData(briefing)
+      // Navigate to dashboard after successful briefing
+      navigate('/dashboard')
     } catch (error) {
       console.error('Failed to generate briefing:', error)
       // Show error to user
@@ -33,28 +33,6 @@ const FlightBriefing = () => {
       setLoading(false)
     }
   }
-
-  // Fetch winds aloft after briefing loads successfully
-  useEffect(() => {
-    const fetchWinds = async () => {
-      try {
-        if (!briefingData?.route?.origin || !briefingData?.route?.destination) return
-        const wl = await weatherService.getWindsAloft({
-          origin: briefingData.route.origin,
-          destination: briefingData.route.destination,
-          flightLevel: briefingData.route.flightLevel,
-          numPoints: 8
-        })
-        setWinds(wl)
-      } catch (err) {
-        console.warn('Failed to fetch winds aloft:', err?.message || err)
-        setWinds(null)
-      }
-    }
-    if (briefingData && !briefingData.error) {
-      fetchWinds()
-    }
-  }, [briefingData])
 
   const getSeverityColor = (level) => {
     switch (level) {
@@ -83,14 +61,14 @@ const FlightBriefing = () => {
 
         {/* Main Form Card */}
         <div className="max-w-5xl mx-auto">
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-4 sm:p-6 overflow-hidden">
+          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-5 sm:p-6">
             <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-slate-900 mb-1">Flight Route Planning</h2>
               <p className="text-slate-600 text-sm">Enter your flight details to get started</p>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-6 px-2 sm:px-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-8 md:gap-x-10 lg:gap-x-12">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Origin Airport
@@ -98,9 +76,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={route.origin}
-                      onChange={(e) => setRoute({...route, origin: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={flightPlan.origin}
+                      onChange={(e) => setFlightPlan({...flightPlan, origin: e.target.value.toUpperCase()})}
+                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="KJFK"
                       maxLength={4}
                       required
@@ -118,9 +96,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={route.destination}
-                      onChange={(e) => setRoute({...route, destination: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={flightPlan.destination}
+                      onChange={(e) => setFlightPlan({...flightPlan, destination: e.target.value.toUpperCase()})}
+                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="KLAX"
                       maxLength={4}
                       required
@@ -138,9 +116,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={route.flightLevel || ''}
-                      onChange={(e) => setRoute({...route, flightLevel: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={flightPlan.flightLevel || ''}
+                      onChange={(e) => setFlightPlan({...flightPlan, flightLevel: e.target.value.toUpperCase()})}
+                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="FL350"
                       maxLength={6}
                     />
@@ -155,9 +133,9 @@ const FlightBriefing = () => {
                 <div className="relative">
                   <input
                     type="text"
-                    value={route.alternates[0]}
-                    onChange={(e) => setRoute({...route, alternates: [e.target.value.toUpperCase()]})}
-                    className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                    value={flightPlan.alternates[0]}
+                    onChange={(e) => setFlightPlan({...flightPlan, alternates: [e.target.value.toUpperCase()]})}
+                    className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                     placeholder="KORD"
                     maxLength={4}
                   />
@@ -170,7 +148,7 @@ const FlightBriefing = () => {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || !route.origin || !route.destination}
+                  disabled={loading || !flightPlan.origin || !flightPlan.destination}
                   className="w-full h-12 text-base font-bold text-white rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
                 >
                   <span className="relative z-10 flex items-center justify-center">
@@ -374,37 +352,6 @@ const FlightBriefing = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Winds Aloft */}
-                {winds?.success && Array.isArray(winds.points) && winds.points.length > 0 && (
-                  <div className="max-w-6xl mx-auto mt-8">
-                    <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-5">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow">
-                          <Plane className="h-5 w-5 text-white" />
-                        </div>
-                        <h2 className="text-lg font-bold text-slate-900">Winds Aloft {briefingData.route?.flightLevel ? `(near ${briefingData.route.flightLevel})` : ''}</h2>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {winds.points.map((pt, idx) => (
-                          <div key={idx} className="bg-white/50 rounded-xl p-4 border border-white/30">
-                            <div className="text-slate-700 text-sm mb-1">
-                              Point {idx + 1} • {pt.lat != null && pt.lon != null ? `${Number(pt.lat).toFixed ? Number(pt.lat).toFixed(2) : pt.lat}, ${Number(pt.lon).toFixed ? Number(pt.lon).toFixed(2) : pt.lon}` : 'N/A'}
-                            </div>
-                            <div className="text-xs text-slate-600">
-                              {pt.windSpeedKt != null ? `${Number(pt.windSpeedKt).toFixed ? Number(pt.windSpeedKt).toFixed(0) : pt.windSpeedKt} kt` : '—'}
-                              {pt.windDirDeg != null ? ` @ ${Math.round(pt.windDirDeg)}°` : ''}
-                              {pt.temperatureC != null ? ` • ${pt.temperatureC}°C` : ''}
-                            </div>
-                            {pt.pressureLevelHpa && (
-                              <div className="text-[10px] text-slate-500 mt-1">Level: {pt.pressureLevelHpa} hPa</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
                 
                 {/* Flight Map */}
                 <div className="max-w-6xl mx-auto mt-8">
@@ -419,7 +366,6 @@ const FlightBriefing = () => {
                         lon: data.airport?.lon
                       }))}
                       enroutePoints={briefingData.routeWeather?.points || []}
-                      windPoints={winds?.points || []}
                       height="500px"
                     />
                   </div>

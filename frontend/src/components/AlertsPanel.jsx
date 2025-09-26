@@ -1,11 +1,9 @@
-import { AlertTriangle, X, Volume2, Play, Pause } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { AlertTriangle, X, Volume2 } from 'lucide-react'
+import { useState } from 'react'
 
 const AlertsPanel = ({ alerts = [] }) => {
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set())
   const [muteAlerts, setMuteAlerts] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentAlertIndex, setCurrentAlertIndex] = useState(0)
 
   // Ensure alerts is an array and filter out any invalid entries
   const validAlerts = Array.isArray(alerts) ? alerts.filter(alert => 
@@ -41,48 +39,11 @@ const AlertsPanel = ({ alerts = [] }) => {
     }
   }
 
-  const speakAlert = (alert) => {
-    if (muteAlerts || !('speechSynthesis' in window)) return
-    
-    const utterance = new SpeechSynthesisUtterance()
-    const alertText = `${getSeverityTitle(alert.severity?.level || 'normal')} for airport ${alert.icao}. ${alert.conditions || alert.message || 'No details available'}`
-    
-    utterance.text = alertText
-    utterance.rate = 0.8
-    utterance.pitch = 1.0
-    utterance.volume = 0.8
-    
-    utterance.onstart = () => setIsPlaying(true)
-    utterance.onend = () => setIsPlaying(false)
-    utterance.onerror = () => setIsPlaying(false)
-    
-    speechSynthesis.speak(utterance)
-  }
-
-  const playAllAlerts = () => {
-    if (activeAlerts.length === 0 || muteAlerts) return
-    
-    setIsPlaying(true)
-    setCurrentAlertIndex(0)
-    speakAlert(activeAlerts[0])
-  }
-
-  const stopSpeaking = () => {
-    speechSynthesis.cancel()
-    setIsPlaying(false)
-  }
-
-  useEffect(() => {
-    return () => {
-      speechSynthesis.cancel()
-    }
-  }, [])
-
   return (
-    <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 max-h-80 overflow-y-auto">
-      <div className="flex items-center justify-between mb-3 sticky top-0 bg-white z-10 pb-3">
-        <h2 className="text-lg font-semibold text-slate-900 flex items-center">
-          <AlertTriangle className="h-4 w-4 mr-2 text-amber-600" />
+    <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900 flex items-center">
+          <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
           Active Alerts
           {activeAlerts.length > 0 && (
             <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
@@ -92,37 +53,24 @@ const AlertsPanel = ({ alerts = [] }) => {
         </h2>
         
         {activeAlerts.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={isPlaying ? stopSpeaking : playAllAlerts}
-              className={`p-2 rounded-lg transition-colors ${
-                isPlaying 
-                  ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                  : 'bg-green-100 text-green-600 hover:bg-green-200'
-              }`}
-              title={isPlaying ? 'Stop speaking' : 'Play alerts'}
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={() => setMuteAlerts(!muteAlerts)}
-              className={`p-2 rounded-lg transition-colors ${
-                muteAlerts 
-                  ? 'bg-slate-200 text-slate-600' 
-                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-              }`}
-              title={muteAlerts ? 'Unmute alerts' : 'Mute alerts'}
-            >
-              <Volume2 className={`h-4 w-4 ${muteAlerts ? 'opacity-50' : ''}`} />
-            </button>
-          </div>
+          <button
+            onClick={() => setMuteAlerts(!muteAlerts)}
+            className={`p-2 rounded-lg transition-colors ${
+              muteAlerts 
+                ? 'bg-slate-200 text-slate-600' 
+                : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+            }`}
+            title={muteAlerts ? 'Unmute alerts' : 'Mute alerts'}
+          >
+            <Volume2 className={`h-4 w-4 ${muteAlerts ? 'opacity-50' : ''}`} />
+          </button>
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {activeAlerts.length === 0 ? (
-          <div className="text-center py-4 text-slate-500">
-            <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <div className="text-center py-8 text-slate-500">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-30" />
             <p className="text-sm">No active weather alerts</p>
             <p className="text-xs mt-1 opacity-70">All monitored airports show normal conditions</p>
           </div>
@@ -130,7 +78,7 @@ const AlertsPanel = ({ alerts = [] }) => {
           activeAlerts.map((alert) => (
             <div
               key={alert.icao}
-              className={`border rounded-lg p-3 ${getSeverityColor(alert.severity?.level || 'normal')} shadow-xs`}
+              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity?.level || 'normal')} shadow-xs`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -150,20 +98,11 @@ const AlertsPanel = ({ alerts = [] }) => {
                   
                   <div className="flex items-center justify-between text-xs opacity-70">
                     <span>Updated {alert.updated || 'Unknown'}</span>
-                    <div className="flex items-center space-x-2">
-                      {alert.severity?.level === 'critical' && (
-                        <span className="bg-red-200 text-red-800 px-2 py-1 rounded font-medium">
-                          IMMEDIATE ATTENTION
-                        </span>
-                      )}
-                      <button
-                        onClick={() => speakAlert(alert)}
-                        className="p-1 hover:bg-black hover:bg-opacity-10 rounded transition-colors"
-                        title="Speak this alert"
-                      >
-                        <Volume2 className="h-3 w-3" />
-                      </button>
-                    </div>
+                    {alert.severity?.level === 'critical' && (
+                      <span className="bg-red-200 text-red-800 px-2 py-1 rounded font-medium">
+                        IMMEDIATE ATTENTION
+                      </span>
+                    )}
                   </div>
                 </div>
                 
