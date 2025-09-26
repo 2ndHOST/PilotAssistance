@@ -10,35 +10,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 })
 
-const FlightMap = ({ route, airports = [], enroutePoints = [], windPoints = [], height = '400px' }) => {
+const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
-
-  const getAirportName = (icao) => {
-    const airportNames = {
-      'VOBL': 'Bangalore',
-      'VABB': 'Mumbai', 
-      'VECC': 'Kolkata',
-      'VIDP': 'Delhi',
-      'VOMM': 'Chennai',
-      'VAGO': 'Goa',
-      'VOCB': 'Coimbatore',
-      'VOTV': 'Thiruvananthapuram',
-      'VOPB': 'Port Blair',
-      'VEGT': 'Guwahati',
-      'KJFK': 'New York JFK',
-      'KLAX': 'Los Angeles',
-      'KORD': 'Chicago O\'Hare',
-      'KDEN': 'Denver',
-      'KBOS': 'Boston',
-      'KSEA': 'Seattle',
-      'KDFW': 'Dallas Fort Worth',
-      'KATL': 'Atlanta',
-      'KMIA': 'Miami',
-      'KLAS': 'Las Vegas'
-    }
-    return airportNames[icao] || icao
-  }
 
   // Get coords for an ICAO from airports prop (each item can include lat/lon)
   const getCoordsForIcao = (icao) => {
@@ -116,9 +90,9 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], windPoints = [], 
 
     const map = mapInstanceRef.current
     
-    // Clear existing non-tile layers before re-rendering
+    // Clear existing layers
     map.eachLayer((layer) => {
-      if (!(layer instanceof L.TileLayer)) {
+      if (layer instanceof L.Marker || layer instanceof L.Polyline) {
         map.removeLayer(layer)
       }
     })
@@ -277,56 +251,17 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], windPoints = [], 
       })
     }
 
-    // Plot winds aloft arrows/summaries
-    if (windPoints && windPoints.length > 0) {
-      windPoints.forEach((pt, idx) => {
-        if (pt.lat != null && pt.lon != null) {
-          const coords = [Number(pt.lat), Number(pt.lon)]
-          const dir = Number.isFinite(Number(pt.windDirDeg)) ? Math.round(Number(pt.windDirDeg)) : null
-          const speed = Number.isFinite(Number(pt.windSpeedKt)) ? Math.round(Number(pt.windSpeedKt)) : null
-
-          const html = `
-            <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4)); transform: rotate(${dir != null ? dir : 0}deg);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3 L15 9 L12 7 L9 9 Z" fill="#0ea5e9"/>
-                <rect x="11" y="7" width="2" height="12" fill="#0ea5e9"/>
-              </svg>
-            </div>
-          `
-
-          const windMarker = L.marker(coords, {
-            icon: L.divIcon({
-              html,
-              className: 'wind-arrow-marker',
-              iconSize: [28, 28],
-              iconAnchor: [14, 14]
-            })
-          })
-          .bindPopup(`
-            <div class="text-xs">
-              <div class="font-semibold">Winds Aloft ${idx + 1}</div>
-              <div class="text-slate-600">${speed != null ? `${speed} kt` : '—'}${dir != null ? ` @ ${dir}°` : ''}${pt.temperatureC != null ? ` • ${pt.temperatureC}°C` : ''}</div>
-              ${pt.pressureLevelHpa ? `<div class="text-slate-500">Level: ${pt.pressureLevelHpa} hPa</div>` : ''}
-            </div>
-          `)
-          .addTo(map)
-
-          markers.push(windMarker)
-        }
-      })
-    }
-
     // Fit map to show all markers
     if (markers.length > 0) {
       const group = new L.featureGroup(markers)
       map.fitBounds(group.getBounds().pad(0.1))
     }
 
-  }, [route, airports, enroutePoints, windPoints])
+  }, [route, airports, enroutePoints])
 
   return (
     <div className="aviation-card overflow-hidden">
-      <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+      <div className="p-4 border-b border-slate-200">
         <h3 className="text-lg font-semibold text-slate-900 flex items-center">
           <svg className="h-5 w-5 mr-2 text-slate-600" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
@@ -334,24 +269,14 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], windPoints = [], 
           Flight Route Map
         </h3>
         {route && route.origin && route.destination && (
-          <div className="mt-2">
-            <div className="flex items-center justify-center space-x-4 text-sm">
-              <div className="text-center">
-                <div className="font-semibold text-slate-900">{route.origin}</div>
-                <div className="text-xs text-slate-500">{getAirportName(route.origin)}</div>
-              </div>
-              <div className="text-slate-400">→</div>
-              <div className="text-center">
-                <div className="font-semibold text-slate-900">{route.destination}</div>
-                <div className="text-xs text-slate-500">{getAirportName(route.destination)}</div>
-              </div>
-            </div>
+          <p className="text-sm text-slate-600 mt-1">
+            {route.origin} → {route.destination}
             {route.alternates && route.alternates.filter(alt => alt).length > 0 && (
-              <div className="mt-2 text-xs text-slate-500 text-center">
-                Alternates: {route.alternates.filter(alt => alt).join(', ')}
-              </div>
+              <span className="ml-2 text-slate-500">
+                (Alternates: {route.alternates.filter(alt => alt).join(', ')})
+              </span>
             )}
-          </div>
+          </p>
         )}
       </div>
       
