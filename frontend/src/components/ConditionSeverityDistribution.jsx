@@ -1,7 +1,19 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Info } from 'lucide-react'
+import TrendAnalysis from './TrendAnalysis'
 
 const ConditionSeverityDistribution = () => {
+  const simulateData = ({ airport, period, interval }) => {
+    const seed = (airport || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)
+    const baseNormal = 55 + (seed % 20)
+    const baseCaution = 30 - (seed % 10)
+    const baseCritical = 100 - baseNormal - baseCaution
+    return [
+      { name: 'Normal', value: baseNormal },
+      { name: 'Caution', value: baseCaution },
+      { name: 'Critical', value: baseCritical }
+    ]
+  }
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
@@ -13,7 +25,7 @@ const ConditionSeverityDistribution = () => {
 
       <div className="text-center space-y-2 mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center justify-center">
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 mr-2">{/* icon dot */}</span>
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 mr-2"></span>
           Condition Severity Distribution
         </h1>
         <p className="text-slate-600 max-w-3xl mx-auto">
@@ -21,73 +33,15 @@ const ConditionSeverityDistribution = () => {
         </p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Analysis Settings */}
-          <div>
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Analysis Settings</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Airport Code</label>
-                <input className="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="e.g., KJFK" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Time Period</label>
-                <select className="w-full border border-slate-300 rounded-lg px-3 py-2">
-                  <option>Last 7 days</option>
-                  <option>Last 14 days</option>
-                  <option>Last 30 days</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Data Interval</label>
-                <select className="w-full border border-slate-300 rounded-lg px-3 py-2">
-                  <option>Hourly</option>
-                  <option>Daily</option>
-                </select>
-              </div>
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg">
-                Generate Analysis
-              </button>
-            </div>
-          </div>
-
-          {/* Trend Visualization */}
-          <div>
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Trend Visualization</h2>
-            <div className="border border-slate-200 rounded-xl h-64 flex items-center justify-center text-slate-400 text-sm text-center px-6">
-              <div>
-                <Info className="h-8 w-8 mx-auto mb-2" />
-                <div>Chart will appear here</div>
-                <div className="text-xs mt-1">Configure settings and click "Generate Analysis" to view trends</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Summary Statistics */}
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-slate-700 mb-3">Summary Statistics</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
-              <div className="text-xs text-slate-500">Average Value</div>
-              <div className="text-slate-400 mt-1">--</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-4 bg-green-50">
-              <div className="text-xs text-slate-500">Maximum Value</div>
-              <div className="text-slate-600 mt-1">--</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-4 bg-orange-50">
-              <div className="text-xs text-slate-500">Minimum Value</div>
-              <div className="text-slate-600 mt-1">--</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-4 bg-purple-50">
-              <div className="text-xs text-slate-500">Trend Direction</div>
-              <div className="text-slate-600 mt-1">--</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TrendAnalysis
+        title="Condition Severity Distribution"
+        description=""
+        chartType="pie"
+        yUnitLabel="%"
+        xKey="name"
+        dataKey="value"
+        simulateData={simulateData}
+      />
     </div>
   )
 }
