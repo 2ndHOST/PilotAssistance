@@ -6,6 +6,7 @@ const weatherRoutes = require('./src/routes/weather');
 const briefingRoutes = require('./src/routes/briefing');
 const WeatherService = require('./src/services/weatherService');
 const flightRoutes = require('./src/routes/flight');
+const airportLookupRoutes = require('./src/routes/airportLookup');
 
 // Initialize weather service
 const weatherService = new WeatherService();
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/weather', weatherRoutes);
 app.use('/api/briefing', briefingRoutes);
 app.use('/api/flight', flightRoutes);
+app.use('/api/airport-lookup', airportLookupRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

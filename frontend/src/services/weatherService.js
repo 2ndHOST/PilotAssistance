@@ -356,6 +356,56 @@ class WeatherService {
       throw error
     }
   }
+
+  /**
+   * Search airports by name, city, ICAO, or IATA code
+   */
+  async searchAirports(query, limit = 10) {
+    try {
+      const response = await this.client.get('/airport-lookup/search', {
+        params: { q: query, limit }
+      })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
+   * Get airport details by ICAO code
+   */
+  async getAirportByIcao(icao) {
+    try {
+      const response = await this.client.get(`/airport-lookup/icao/${icao}`)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
+   * Get airport details by IATA code
+   */
+  async getAirportByIata(iata) {
+    try {
+      const response = await this.client.get(`/airport-lookup/iata/${iata}`)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
+   * Validate and resolve multiple airport codes/names
+   */
+  async validateAirports(airports) {
+    try {
+      const response = await this.client.post('/airport-lookup/validate', { airports })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  }
 }
 
 // Create singleton instance
