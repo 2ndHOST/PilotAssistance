@@ -262,10 +262,10 @@ class WeatherService {
     }
   }
 
-  // Airport search for typeahead
-  async searchAirports(q) {
+  // Airport search for typeahead (supports global ICAO; backend aggregates providers)
+  async searchAirports(q, limit = 15) {
     try {
-      const response = await this.client.get(`/weather/airports/search`, { params: { q } })
+      const response = await this.client.get(`/weather/airports/search`, { params: { q, limit } })
       return response.data
     } catch (error) {
       throw error
@@ -357,19 +357,7 @@ class WeatherService {
     }
   }
 
-  /**
-   * Search airports by name, city, ICAO, or IATA code
-   */
-  async searchAirports(query, limit = 10) {
-    try {
-      const response = await this.client.get('/airport-lookup/search', {
-        params: { q: query, limit }
-      })
-      return response.data
-    } catch (error) {
-      throw error
-    }
-  }
+  // Note: legacy airport-lookup endpoints removed in favor of /weather/airports/search
 
   /**
    * Get airport details by ICAO code

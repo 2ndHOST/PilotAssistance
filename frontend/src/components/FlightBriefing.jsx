@@ -6,6 +6,7 @@ import FlightMap from './FlightMap'
 import AlertsPanel from './AlertsPanel'
 import TTSControls from './TTSControls'
 import AirportInput from './AirportInput'
+
 const FlightBriefing = () => {
   const [briefingData, setBriefingData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -61,7 +62,7 @@ const FlightBriefing = () => {
 
         {/* Main Form Card */}
         <div className="max-w-5xl mx-auto">
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-4 sm:p-6 overflow-hidden">
+          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 sm:p-8 overflow-hidden">
             <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-slate-900 mb-1">Flight Route Planning</h2>
               <p className="text-slate-600 text-sm">Enter your flight details to get started</p>
@@ -72,7 +73,7 @@ const FlightBriefing = () => {
                 <AirportInput
                   value={route.origin}
                   onChange={(value) => setRoute({...route, origin: value})}
-                  placeholder="Enter origin airport (e.g., JFK, New York, KJFK)"
+                  placeholder="JFK, New York,KJFK"
                   label="Origin Airport"
                   required={true}
                 />
@@ -80,7 +81,7 @@ const FlightBriefing = () => {
                 <AirportInput
                   value={route.destination}
                   onChange={(value) => setRoute({...route, destination: value})}
-                  placeholder="Enter destination airport (e.g., LAX, Los Angeles, KLAX)"
+                  placeholder="LAX, Los Angeles, KLAX"
                   label="Destination Airport"
                   required={true}
                 />
@@ -94,7 +95,7 @@ const FlightBriefing = () => {
                       type="text"
                       value={route.flightLevel || ''}
                       onChange={(e) => setRoute({...route, flightLevel: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      className="w-57 max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="FL350"
                       maxLength={6}
                     />
@@ -106,7 +107,7 @@ const FlightBriefing = () => {
                 <AirportInput
                   value={route.alternates[0]}
                   onChange={(value) => setRoute({...route, alternates: [value]})}
-                  placeholder="Enter alternate airport (e.g., ORD, Chicago, KORD)"
+                  placeholder="ORD, Chicago, KORD"
                   label="Alternate Airport (Optional)"
                   required={false}
                 />

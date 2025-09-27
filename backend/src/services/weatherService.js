@@ -8,6 +8,7 @@ class WeatherService {
     this.cache = new Map();
     this.cacheTimeout = parseInt(process.env.WEATHER_CACHE_TTL) || 5 * 60 * 1000; // 5 minutes
     this.failedAPIs = new Set(); // Track failed APIs to avoid retrying
+    this.openAirportsCache = { data: null, fetchedAt: 0 }; // Cache for open dataset
     
     // API Configuration
     this.avwxApiKey = process.env.AVWX_API_KEY;
@@ -86,6 +87,50 @@ class WeatherService {
         taf: 'TAF VIDP 121120Z 1212/1318 32018G30KT 6SM HZ SCT020 BKN040 FM121800 30012KT P6SM SCT025='
       }
     };
+
+  // ------- Open dataset fallback (no API key) -------
+  this.getOpenAirportsData = async () => {
+    const TTL = 24 * 60 * 60 * 1000; // 24 hours
+    if (this.openAirportsCache.data && (Date.now() - this.openAirportsCache.fetchedAt) < TTL) {
+      return this.openAirportsCache.data;
+    }
+    const url = 'https://raw.githubusercontent.com/mwgg/Airports/master/airports.json';
+    const resp = await axios.get(url, { timeout: 20000, headers: { 'User-Agent': 'PilotAssistant/1.0' } });
+    const data = resp.data || {};
+    this.openAirportsCache = { data, fetchedAt: Date.now() };
+    return data;
+  };
+
+  this.searchAirportsOpenDataset = async (q, limit = 10) => {
+    const data = await this.getOpenAirportsData();
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10));
+    const Q = String(q).toUpperCase();
+    const results = [];
+    for (const icao in data) {
+      if (!icao || icao.length !== 4) continue;
+      const a = data[icao] || {};
+      const name = String(a.name || '').toUpperCase();
+      const city = String(a.city || '').toUpperCase();
+      const country = String(a.country || a.cc || '').toUpperCase();
+      const iata = String(a.iata || '').toUpperCase();
+      // Match on ICAO/IATA/name/city/country contains
+      const hay = `${icao} ${iata} ${name} ${city} ${country}`;
+      if (hay.includes(Q)) {
+        results.push({
+          icao,
+          name: a.name || null,
+          country: a.country || a.cc || null,
+          city: a.city || null,
+          lat: a.lat || a.latitude,
+          lon: a.lon || a.longitude,
+          elevationFt: a.elev || a.elevation_ft || null,
+          iata: a.iata || null
+        });
+        if (results.length >= lim) break;
+      }
+    }
+    return results;
+  };
     
     // NOTAM mock data - airport-specific
     this.mockNotams = {
@@ -503,19 +548,25 @@ class WeatherService {
   }
 
   /** Search airports for typeahead */
-  async searchAirports(query) {
+  async searchAirports(query, limit = 10) {
     const q = String(query).trim();
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10));
     if (!q) return [];
     // Try AeroDataBox search first (good coverage)
     try {
       if (this.aeroDataBoxApiKey) {
-        return await this.searchAirportsAeroDataBox(q);
+        return await this.searchAirportsAeroDataBox(q, lim);
       }
     } catch (_) {}
     try {
       if (this.checkwxApiKey) {
-        return await this.searchAirportsCheckWX(q);
+        return await this.searchAirportsCheckWX(q, lim);
       }
+    } catch (_) {}
+    // Fallback to open airports dataset (no API key required)
+    try {
+      const openResults = await this.searchAirportsOpenDataset(q, lim);
+      if (openResults.length) return openResults.slice(0, lim);
     } catch (_) {}
     // Minimal fallback: if looks like ICAO, just return that
     if (/^[A-Za-z]{4}$/.test(q)) {
@@ -732,13 +783,15 @@ class WeatherService {
     };
   }
 
-  async searchAirportsAeroDataBox(q) {
-    const url = `${this.aeroDataBoxBaseUrl}/airports/search/term?q=${encodeURIComponent(q)}&limit=10`;
+  async searchAirportsAeroDataBox(q, limit = 10) {
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10));
+    const url = `${this.aeroDataBoxBaseUrl}/airports/search/term?q=${encodeURIComponent(q)}&limit=${lim}`;
     const resp = await axios.get(url, { headers: { 'X-RapidAPI-Key': this.aeroDataBoxApiKey }, timeout: 12000 });
     return (resp.data?.items || []).map(it => ({
       icao: it.icao || it.icaoCode,
       name: it.name,
       country: it.country?.name || it.country,
+      city: it.municipalityName || it.municipality || it.city || null,
       lat: it.location?.lat,
       lon: it.location?.lon,
       elevationFt: it.fieldElevation?.ft || null,
@@ -746,13 +799,15 @@ class WeatherService {
     })).filter(a => a.icao);
   }
 
-  async searchAirportsCheckWX(q) {
+  async searchAirportsCheckWX(q, limit = 10) {
     const url = `${this.checkwxBaseUrl}/search/airport/${encodeURIComponent(q)}`;
     const resp = await axios.get(url, { headers: { 'X-API-Key': this.checkwxApiKey, 'User-Agent': 'PilotAssistant/1.0' }, timeout: 10000 });
-    return (resp.data?.data || []).slice(0, 10).map(d => ({
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10));
+    return (resp.data?.data || []).slice(0, lim).map(d => ({
       icao: d.icao,
       name: d.name,
       country: d.country?.name || d.country,
+      city: d.city || d.municipality || null,
       lat: d.position?.latitude,
       lon: d.position?.longitude,
       elevationFt: d.elevation?.feet || null,

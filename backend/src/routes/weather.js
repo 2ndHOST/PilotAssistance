@@ -293,12 +293,13 @@ router.delete('/cache', (req, res) => {
  */
 router.get('/airports/search', async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, limit } = req.query;
     if (!q || String(q).trim().length < 2) {
       return res.status(400).json({ error: 'Invalid query', message: 'Provide at least 2 characters' });
     }
-    const results = await weatherService.searchAirports(q);
-    res.json({ success: true, results, count: results.length });
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10));
+    const results = await weatherService.searchAirports(q, lim);
+    res.json({ success: true, results: results.slice(0, lim), count: Math.min(results.length, lim) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to search airports', message: error.message });
   }
