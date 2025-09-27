@@ -5,6 +5,7 @@ import WeatherCard from './WeatherCard'
 import FlightMap from './FlightMap'
 import AlertsPanel from './AlertsPanel'
 import TTSControls from './TTSControls'
+import AirportInput from './AirportInput'
 const FlightBriefing = () => {
   const [briefingData, setBriefingData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -68,45 +69,21 @@ const FlightBriefing = () => {
             
             <form onSubmit={handleSubmit} className="space-y-6 px-2 sm:px-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-8 md:gap-x-10 lg:gap-x-12">
-                <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
-                    Origin Airport
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={route.origin}
-                      onChange={(e) => setRoute({...route, origin: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                      placeholder="KJFK"
-                      maxLength={4}
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4">
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
-                    </div>
-                  </div>
-                </div>
+                <AirportInput
+                  value={route.origin}
+                  onChange={(value) => setRoute({...route, origin: value})}
+                  placeholder="Enter origin airport (e.g., JFK, New York, KJFK)"
+                  label="Origin Airport"
+                  required={true}
+                />
                 
-                <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
-                    Destination Airport
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={route.destination}
-                      onChange={(e) => setRoute({...route, destination: e.target.value.toUpperCase()})}
-                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                      placeholder="KLAX"
-                      maxLength={4}
-                      required
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4">
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
-                    </div>
-                  </div>
-                </div>
+                <AirportInput
+                  value={route.destination}
+                  onChange={(value) => setRoute({...route, destination: value})}
+                  placeholder="Enter destination airport (e.g., LAX, Los Angeles, KLAX)"
+                  label="Destination Airport"
+                  required={true}
+                />
 
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
@@ -125,23 +102,14 @@ const FlightBriefing = () => {
                 </div>
               </div>
               
-              <div className="space-y-3 pt-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  Alternate Airport <span className="text-slate-500 font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={route.alternates[0]}
-                    onChange={(e) => setRoute({...route, alternates: [e.target.value.toUpperCase()]})}
-                    className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                    placeholder="KORD"
-                    maxLength={4}
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-4">
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">ICAO</span>
-                  </div>
-                </div>
+              <div className="pt-2">
+                <AirportInput
+                  value={route.alternates[0]}
+                  onChange={(value) => setRoute({...route, alternates: [value]})}
+                  placeholder="Enter alternate airport (e.g., ORD, Chicago, KORD)"
+                  label="Alternate Airport (Optional)"
+                  required={false}
+                />
               </div>
 
               <div className="pt-2">
