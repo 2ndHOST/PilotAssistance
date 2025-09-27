@@ -5,24 +5,23 @@ import WeatherCard from './WeatherCard'
 import FlightMap from './FlightMap'
 import AlertsPanel from './AlertsPanel'
 import TTSControls from './TTSControls'
-import { useFlightPlan } from '../context/FlightPlanContext'
-import { useNavigate } from 'react-router-dom'
-
 const FlightBriefing = () => {
   const [briefingData, setBriefingData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { flightPlan, setFlightPlan } = useFlightPlan()
-  const navigate = useNavigate()
+  const [route, setRoute] = useState({
+    origin: '',
+    destination: '',
+    alternates: [''],
+    flightLevel: 'FL350'
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     
     try {
-      const briefing = await weatherService.getFlightBriefing(flightPlan)
+      const briefing = await weatherService.getFlightBriefing(route)
       setBriefingData(briefing)
-      // Navigate to dashboard after successful briefing
-      navigate('/dashboard')
     } catch (error) {
       console.error('Failed to generate briefing:', error)
       // Show error to user
@@ -61,14 +60,14 @@ const FlightBriefing = () => {
 
         {/* Main Form Card */}
         <div className="max-w-5xl mx-auto">
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-5 sm:p-6">
+          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-4 sm:p-6 overflow-hidden">
             <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-slate-900 mb-1">Flight Route Planning</h2>
               <p className="text-slate-600 text-sm">Enter your flight details to get started</p>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-6 px-2 sm:px-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-y-6 gap-x-8 md:gap-x-10 lg:gap-x-12">
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Origin Airport
@@ -76,9 +75,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={flightPlan.origin}
-                      onChange={(e) => setFlightPlan({...flightPlan, origin: e.target.value.toUpperCase()})}
-                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={route.origin}
+                      onChange={(e) => setRoute({...route, origin: e.target.value.toUpperCase()})}
+                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="KJFK"
                       maxLength={4}
                       required
@@ -96,9 +95,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={flightPlan.destination}
-                      onChange={(e) => setFlightPlan({...flightPlan, destination: e.target.value.toUpperCase()})}
-                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={route.destination}
+                      onChange={(e) => setRoute({...route, destination: e.target.value.toUpperCase()})}
+                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="KLAX"
                       maxLength={4}
                       required
@@ -116,9 +115,9 @@ const FlightBriefing = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      value={flightPlan.flightLevel || ''}
-                      onChange={(e) => setFlightPlan({...flightPlan, flightLevel: e.target.value.toUpperCase()})}
-                      className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                      value={route.flightLevel || ''}
+                      onChange={(e) => setRoute({...route, flightLevel: e.target.value.toUpperCase()})}
+                      className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                       placeholder="FL350"
                       maxLength={6}
                     />
@@ -133,9 +132,9 @@ const FlightBriefing = () => {
                 <div className="relative">
                   <input
                     type="text"
-                    value={flightPlan.alternates[0]}
-                    onChange={(e) => setFlightPlan({...flightPlan, alternates: [e.target.value.toUpperCase()]})}
-                    className="w-full h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                    value={route.alternates[0]}
+                    onChange={(e) => setRoute({...route, alternates: [e.target.value.toUpperCase()]})}
+                    className="w-full max-w-sm h-12 px-4 text-base font-medium bg-white/80 border-2 border-slate-200 rounded-xl placeholder-slate-400 focus:ring-2 focus:ring-blue-200/50 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                     placeholder="KORD"
                     maxLength={4}
                   />
@@ -148,7 +147,7 @@ const FlightBriefing = () => {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || !flightPlan.origin || !flightPlan.destination}
+                  disabled={loading || !route.origin || !route.destination}
                   className="w-full h-12 text-base font-bold text-white rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
                 >
                   <span className="relative z-10 flex items-center justify-center">
