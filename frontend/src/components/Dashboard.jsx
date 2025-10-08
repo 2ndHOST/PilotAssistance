@@ -16,6 +16,7 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [flightSearchTerm, setFlightSearchTerm] = useState('')
   const [showFlightSearch, setShowFlightSearch] = useState(false)
+  const [airportNames, setAirportNames] = useState({})
 
   useEffect(() => {
     let timer
@@ -60,6 +61,7 @@ const Dashboard = () => {
         if (current?.routeAirports) {
           const airports = current.routeAirports.map(a => ({
             icao: a.icao,
+            name: a.name || a.airportName || null,
             lat: a.lat,
             lon: a.lon,
             conditions: a.conditions,
@@ -67,6 +69,30 @@ const Dashboard = () => {
           }))
           setQuickWeather(airports)
         }
+
+        // Resolve missing names (fallback via airport details)
+        try {
+          const icaos = new Set()
+          if (current?.departure) icaos.add(current.departure)
+          if (current?.destination) icaos.add(current.destination)
+          ;(current?.routeAirports || []).forEach(a => icaos.add(a.icao))
+          const toFetch = Array.from(icaos).filter(icao => {
+            const fromRoute = (current?.routeAirports || []).find(x => x.icao === icao)
+            return !fromRoute?.name && !fromRoute?.airportName
+          })
+          if (toFetch.length) {
+            const results = await Promise.allSettled(toFetch.map(icao => weatherService.getAirportDetails(icao)))
+            const map = {}
+            results.forEach((res, idx) => {
+              const icao = toFetch[idx]
+              if (res.status === 'fulfilled') {
+                const d = res.value?.airport || res.value || {}
+                map[icao] = d.name || d.city || ''
+              }
+            })
+            if (Object.keys(map).length) setAirportNames(prev => ({ ...prev, ...map }))
+          }
+        } catch {}
       } catch (e) {
         console.error('Failed to load flight data', e)
       } finally {
@@ -137,6 +163,12 @@ const Dashboard = () => {
 
   const departureIcao = currentFlight?.departure || '—'
   const destinationIcao = currentFlight?.destination || '—'
+  const nameByIcao = (icao) => {
+    const a = (currentFlight?.routeAirports || []).find(x => x.icao === icao)
+    return a?.name || a?.airportName || airportNames[icao] || ''
+  }
+  const departureName = departureIcao && departureIcao !== '—' ? nameByIcao(departureIcao) : ''
+  const destinationName = destinationIcao && destinationIcao !== '—' ? nameByIcao(destinationIcao) : ''
   const plannedFlightTime = currentFlight?.flightTime || '—'
   const plannedDistance = (currentFlight?.distanceKm != null) ? `${currentFlight.distanceKm} km` : '—'
 
@@ -163,6 +195,9 @@ const Dashboard = () => {
                 <div>
                   <p className="text-sm text-slate-600">Departure</p>
                   <p className="text-xl font-bold text-slate-900">{departureIcao}</p>
+                  {departureName && (
+                    <p className="text-xs text-slate-500 leading-tight">{departureName}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -177,6 +212,9 @@ const Dashboard = () => {
                 <div>
                   <p className="text-sm text-slate-600">Destination</p>
                   <p className="text-xl font-bold text-slate-900">{destinationIcao}</p>
+                  {destinationName && (
+                    <p className="text-xs text-slate-500 leading-tight">{destinationName}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -219,6 +257,7 @@ const Dashboard = () => {
               route={{ origin: departureIcao, destination: destinationIcao, alternates: [] }}
               airports={quickWeather}
               height="360px"
+              airportNames={airportNames}
             />
             <div className="mt-2 text-xs text-slate-500">Updated {minutesAgo} min ago</div>
           </div>
@@ -228,6 +267,10 @@ const Dashboard = () => {
         <div className="space-y-6">
           {/* Weather Alerts Along Route */}
           <AlertsPanel 
+            compact={true}
+            dense={true}
+            fixedHeight={220}
+            showTTS={true}
             alerts={quickWeather
               .filter(w => w.severity && w.severity.level && w.severity.level !== 'normal')
               .map(w => ({
@@ -327,7 +370,8 @@ const Dashboard = () => {
         <h2 className="text-xl font-semibold text-slate-900 mb-4 sticky top-0 bg-white z-10 pb-4">Flight Route Weather Summary</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {['Departure','Enroute','Arrival'].map((label, idx) => {
-            const w = quickWeather[idx] || quickWeather[0] || { icao: '—', conditions: '—', severity: { level: 'unknown', emoji: '⚪' }, updated: '—' }
+            const w = quickWeather[idx] || quickWeather[0] || { icao: '—', name: '', conditions: '—', severity: { level: 'unknown', emoji: '⚪' }, updated: '—' }
+            const airportName = (currentFlight?.routeAirports?.find(airport => airport.icao === w.icao)?.name) || airportNames[w.icao] || ''
             return (
               <div key={label} className={`p-4 rounded-lg border ${getSeverityColor(w.severity.level)}`}>
                 <div className="flex items-center justify-between mb-2">
@@ -338,6 +382,9 @@ const Dashboard = () => {
                   <span className="text-2xl">{w.severity.emoji}</span>
                   <div>
                     <div className="text-lg font-semibold text-slate-900">{w.icao}</div>
+                    {airportName && (
+                      <div className="text-xs text-slate-600 -mt-0.5">{airportName}</div>
+                    )}
                     <div className="text-sm text-slate-600">{w.conditions}</div>
                   </div>
                 </div>

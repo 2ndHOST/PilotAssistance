@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Cloud, FileText, Thermometer, Wind, Gauge, Compass, Zap, LineChart, Sparkles, AlertTriangle, MapPin, MessageSquare, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import weatherService from '../services/weatherService'
 
 const CardHeader = ({ title }) => (
   <div className="px-6 py-4 border-b border-slate-100">
@@ -19,86 +20,166 @@ const DecoderPanel = ({ type, isOpen, onClose }) => {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // Build a plain-English summary, avoiding any JSON-like or coded METAR strings
+  const buildPlainSummary = (res) => {
+    if (!res?.success) return ''
+    const raw = res.decoded?.summary
+    const details = res.decoded?.details || {}
+    const looksJsonLike = (s) => typeof s === 'string' && /\{[\s\S]*\}/.test(s) && /"[^"]+"\s*:/.test(s)
+    const looksCodedMetar = (s) => typeof s === 'string' && (
+      /\b[A-Z]{4}\b\s+\d{6}Z/.test(s) ||
+      /\b\d{3}\d{2}KT\b/.test(s) ||
+      /\b(\d{1,2})SM\b/.test(s) ||
+      /\b(Q\d{4}|A\d{4})\b/.test(s) ||
+      /\b(FEW|SCT|BKN|OVC)\d{3}\b/.test(s)
+    )
+
+    const station = details.airport || 'the airport'
+    const when = details.time
+    const wind = details.wind
+    const vis = details.visibility
+    const clouds = details.clouds
+    const temp = details.temperature
+    const press = details.pressure
+
+    const parts = []
+    parts.push(`Weather report for ${station}${when ? ` at ${when}` : ''}.`)
+    if (wind) parts.push(`Winds: ${wind}.`)
+    if (vis) parts.push(`Visibility: ${vis}.`)
+    if (clouds) parts.push(`Clouds: ${clouds}.`)
+    if (temp) parts.push(`Temperature: ${temp}.`)
+    if (press) parts.push(`Pressure: ${press}.`)
+    const narrative = parts.filter(Boolean).join(' ')
+
+    // Prefer constructed narrative when we have any structured info
+    if (narrative && narrative.trim() !== 'Weather report for the airport.') {
+      return narrative
+    }
+
+  // Minimal METAR parser for common groups; returns an object similar to decoded.details
+  const parseMetarDetails = (raw) => {
+    if (typeof raw !== 'string') return {}
+    const text = raw.trim()
+    const parts = text.split(/\s+/)
+    const details = {}
+
+    // Station
+    const metarIdx = parts[0] === 'METAR' || parts[0] === 'SPECI' ? 0 : -1
+    const stationIdx = metarIdx === 0 ? 1 : 0
+    details.airport = parts[stationIdx] || undefined
+
+    // Time
+    const timeToken = parts.find(p => /\d{6}Z/.test(p))
+    if (timeToken) {
+      const day = timeToken.slice(0,2)
+      const hh = timeToken.slice(2,4)
+      const mm = timeToken.slice(4,6)
+      details.time = `${hh}:${mm}Z on the ${day}th`
+    }
+
+    // Wind
+    const windToken = parts.find(p => /^(\d{3}|VRB)\d{2}(G\d{2})?KT$/.test(p))
+    if (windToken) {
+      const m = windToken.match(/^(\d{3}|VRB)(\d{2})(G(\d{2}))?KT$/)
+      if (m) {
+        const dir = m[1]
+        const spd = m[2]
+        const gst = m[4]
+        details.wind = `${dir === 'VRB' ? 'Variable' : `${dir}°`} at ${parseInt(spd,10)} knots${gst ? `, gusting ${parseInt(gst,10)}` : ''}`
+      }
+    }
+
+    // Visibility
+    const visSM = parts.find(p => /^(P)?\d+SM$/.test(p))
+    const visM = parts.find(p => /^\d{4}$/.test(p))
+    if (visSM) {
+      details.visibility = visSM.replace('P','')
+        .replace('SM',' statute miles')
+        .replace(/^\b(\d+)\b/, (_,n) => `${n}`)
+    } else if (visM) {
+      if (visM === '9999') details.visibility = '10 km or more'
+      else details.visibility = `${parseInt(visM,10)} meters`
+    }
+
+    // Clouds
+    const cloudTokens = parts.filter(p => /^(FEW|SCT|BKN|OVC)\d{3}/.test(p))
+    if (cloudTokens.length) {
+      const map = { FEW: 'Few', SCT: 'Scattered', BKN: 'Broken', OVC: 'Overcast' }
+      details.clouds = cloudTokens.map(tok => {
+        const m = tok.match(/^(FEW|SCT|BKN|OVC)(\d{3})/)
+        if (!m) return tok
+        const type = map[m[1]] || m[1]
+        const base = parseInt(m[2],10) * 100
+        return `${type} clouds at ${base.toLocaleString()} ft`
+      }).join(', ')
+    }
+
+    // Temperature / Dewpoint
+    const tdp = parts.find(p => /^(M?\d{1,2})\/(M?\d{1,2})$/.test(p))
+    if (tdp) {
+      const m = tdp.match(/^(M?\d{1,2})\/(M?\d{1,2})$/)
+      const t = m[1].startsWith('M') ? -parseInt(m[1].slice(1),10) : parseInt(m[1],10)
+      const d = m[2].startsWith('M') ? -parseInt(m[2].slice(1),10) : parseInt(m[2],10)
+      details.temperature = `${t}°C / ${d}°C`
+    }
+
+    // Pressure
+    const qnh = parts.find(p => /^Q\d{4}$/.test(p))
+    const alt = parts.find(p => /^A\d{4}$/.test(p))
+    if (qnh) {
+      details.pressure = `${parseInt(qnh.slice(1),10)} hPa`
+    } else if (alt) {
+      const val = (parseInt(alt.slice(1),10) / 100).toFixed(2)
+      details.pressure = `${val} inHg`
+    }
+
+    return details
+  }
+
+    // Last resort: only use raw summary if it is not JSON-like nor coded METAR
+    if (raw && !looksJsonLike(raw) && !looksCodedMetar(raw)) {
+      return raw
+    }
+
+    return ''
+  }
+
   const handleDecode = async () => {
     if (!input.trim()) return
     
     setLoading(true)
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      const mockResults = {
-        metar: {
-          success: true,
-          decoded: {
-            summary: 'METAR decoded: KORD 101551Z 27015KT 10SM FEW250 15/12 A2992 RMK AO2 SLP134 T01500117',
-            details: {
-              airport: 'KORD (Chicago O\'Hare)',
-              time: '15:51 UTC on the 10th',
-              wind: '270° at 15 knots',
-              visibility: '10 statute miles',
-              clouds: 'Few clouds at 25,000 ft',
-              temperature: '15°C / 12°C',
-              pressure: '29.92 inHg'
-            }
-          }
-        },
-        taf: {
-          success: true,
-          decoded: {
-            summary: 'TAF decoded: KORD 101200Z 1012/1112 27012KT P6SM FEW250 FM101800 28015G25KT P6SM SCT040 BKN080 TEMPO 1020/1024 2SM TSRA BKN040CB',
-            details: {
-              airport: 'KORD (Chicago O\'Hare)',
-              validPeriod: '12:00 UTC 10th to 12:00 UTC 11th',
-              wind: '270° at 12 knots, gusting to 25 knots after 18:00',
-              visibility: '6+ statute miles',
-              clouds: 'Few at 25,000 ft, scattered at 4,000 ft, broken at 8,000 ft',
-              conditions: 'Temporary thunderstorms with 2 mile visibility'
-            }
-          }
-        },
-        notam: {
-          success: true,
-          decoded: {
-            summary: 'NOTAM decoded: Runway 09L/27R closed for maintenance until 2024-01-15 1200Z. Use runway 09R/27L as alternate.',
-            details: {
-              type: 'Runway Closure',
-              validUntil: '2024-01-15 1200Z',
-              affectedRunway: '09L/27R',
-              alternateRunway: '09R/27L'
-            }
-          }
-        },
-        sigmet: {
-          success: true,
-          decoded: {
-            summary: 'SIGMET decoded: Severe turbulence reported at FL250-350 over area bounded by coordinates. Valid until 2024-01-10 1800Z.',
-            details: {
-              type: 'Severe Turbulence',
-              altitude: 'FL250-350',
-              validUntil: '2024-01-10 1800Z',
-              severity: 'Severe'
-            }
-          }
-        },
-        pirep: {
-          success: true,
-          decoded: {
-            summary: 'PIREP decoded: Moderate turbulence at FL180, light icing conditions, visibility 10+ miles, scattered clouds at 3000ft.',
-            details: {
-              altitude: 'FL180',
-              turbulence: 'Moderate',
-              icing: 'Light',
-              visibility: '10+ miles',
-              clouds: 'Scattered at 3000ft'
-            }
-          }
+      const decoded = await weatherService.decodeWeather(input.trim(), type)
+      // If backend lacks details, parse them client-side from the raw input
+      const parsedDetails = decoded?.decoded?.details && Object.keys(decoded.decoded.details).length > 0
+        ? decoded.decoded.details
+        : parseMetarDetails(input)
+
+      const ensured = {
+        ...decoded,
+        decoded: {
+          ...(decoded?.decoded || {}),
+          details: parsedDetails,
+          summary: buildPlainSummary({ ...decoded, decoded: { ...(decoded?.decoded || {}), details: parsedDetails } })
         }
       }
-      
-      setResult(mockResults[type] || { success: true, decoded: { summary: 'Decoded successfully' } })
+      setResult(ensured)
     } catch (error) {
-      setResult({ success: false, error: 'Failed to decode: ' + error.message })
+      // Offline/local fallback: try to parse METAR locally into English
+      if (type === 'metar') {
+        const localDetails = parseMetarDetails(input)
+        const localRes = { success: true, decoded: { details: localDetails } }
+        const localSummary = buildPlainSummary(localRes)
+        setResult({
+          success: true,
+          decoded: {
+            details: localDetails,
+            summary: localSummary
+          }
+        })
+      } else {
+        setResult({ success: false, error: 'Failed to decode: ' + (error?.message || 'Unknown error') })
+      }
     } finally {
       setLoading(false)
     }
@@ -157,12 +238,7 @@ const DecoderPanel = ({ type, isOpen, onClose }) => {
               <h5 className="font-medium text-slate-900 mb-2">Decoded Result:</h5>
               {result.success ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-700">{result.decoded.summary}</p>
-                  {result.decoded.details && (
-                    <div className="text-xs text-slate-500">
-                      <pre className="whitespace-pre-wrap">{JSON.stringify(result.decoded.details, null, 2)}</pre>
-                    </div>
-                  )}
+                  <p className="text-sm text-slate-700 leading-relaxed">{buildPlainSummary(result)}</p>
                 </div>
               ) : (
                 <p className="text-sm text-red-600">{result.error}</p>

@@ -10,19 +10,188 @@ const WeatherDecoder = ({ initialType = 'metar' }) => {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // Build a plain, readable English summary from structured data or by parsing any JSON-like text
+  const buildPlainSummary = (res) => {
+    if (!res) return ''
+
+    // Helper: detect if a string looks like JSON content
+    const looksJsonLike = (s) => typeof s === 'string' && /\{[\s\S]*\}/.test(s) && /"[^"]+"\s*:/.test(s)
+    // Helper: detect if a string looks like coded METAR/TAF text
+    const looksCodedMetar = (s) => typeof s === 'string' && (
+      /\b[A-Z]{4}\b\s+\d{6}Z/.test(s) || // ICAO + time
+      /\b\d{3}\d{2}KT\b/.test(s) || // wind 27015KT
+      /\b(\d{1,2})SM\b/.test(s) || // visibility in SM
+      /\b(Q\d{4}|A\d{4})\b/.test(s) || // pressure QNH or altimeter
+      /\b(FEW|SCT|BKN|OVC)\d{3}\b/.test(s) // cloud groups
+    )
+
+    // Prefer constructing from structured fields
+    const d = res.decoded?.details || {}
+    const p = res.parsed || {}
+
+    const hasStructured = [d.wind, d.visibility, d.temperature, d.pressure, d.weather, d.clouds, p.station, p.icao, p.airport].some(Boolean)
+
+    const station = p.station || p.icao || p.airport || 'the airport'
+    const when = p.time || p.observation_time || res.timestamp
+    const wind = d.wind || p.wind || p.wind_info
+    const vis = d.visibility || p.visibility
+    const temp = d.temperature || p.temperature
+    const press = d.pressure || p.altimeter || p.qnh
+    const wx = d.weather || p.weather || p.weather_phenomena
+    const clouds = d.clouds || p.clouds
+
+    const assemble = ({ station, when, wind, vis, temp, press, wx, clouds, severity }) => {
+      const parts = []
+      parts.push(`Weather report for ${station}${when ? ` at ${new Date(when).toLocaleString()}` : ''}.`)
+      if (wind) parts.push(`Winds: ${wind}.`)
+      if (vis) parts.push(`Visibility: ${vis}.`)
+      if (temp) parts.push(`Temperature: ${temp}.`)
+      if (press) parts.push(`Pressure: ${press}.`)
+      if (wx && wx !== 'No significant weather') parts.push(`Weather: ${wx}.`)
+      if (clouds) parts.push(`Clouds: ${clouds}.`)
+      if (severity?.description) {
+        parts.push(`Overall conditions: ${severity.description}.`)
+        if (Array.isArray(severity.reasons) && severity.reasons.length) {
+          parts.push(`Key concerns: ${severity.reasons.join(', ')}.`)
+        }
+
+  // Minimal METAR parser for common groups; returns an object similar to decoded.details
+  const parseMetarDetails = (raw) => {
+    if (typeof raw !== 'string') return {}
+    const text = raw.trim()
+    const parts = text.split(/\s+/)
+    const details = {}
+
+    const metarIdx = parts[0] === 'METAR' || parts[0] === 'SPECI' ? 0 : -1
+    const stationIdx = metarIdx === 0 ? 1 : 0
+    details.airport = parts[stationIdx] || undefined
+
+    const timeToken = parts.find(p => /\d{6}Z/.test(p))
+    if (timeToken) {
+      const day = timeToken.slice(0,2)
+      const hh = timeToken.slice(2,4)
+      const mm = timeToken.slice(4,6)
+      details.time = `${hh}:${mm}Z on the ${day}th`
+    }
+
+    const windToken = parts.find(p => /^(\d{3}|VRB)\d{2}(G\d{2})?KT$/.test(p))
+    if (windToken) {
+      const m = windToken.match(/^(\d{3}|VRB)(\d{2})(G(\d{2}))?KT$/)
+      if (m) {
+        const dir = m[1]
+        const spd = m[2]
+        const gst = m[4]
+        details.wind = `${dir === 'VRB' ? 'Variable' : `${dir}°`} at ${parseInt(spd,10)} knots${gst ? `, gusting ${parseInt(gst,10)}` : ''}`
+      }
+    }
+
+    const visSM = parts.find(p => /^(P)?\d+SM$/.test(p))
+    const visM = parts.find(p => /^\d{4}$/.test(p))
+    if (visSM) {
+      details.visibility = visSM.replace('P','').replace('SM',' statute miles')
+    } else if (visM) {
+      details.visibility = visM === '9999' ? '10 km or more' : `${parseInt(visM,10)} meters`
+    }
+
+    const cloudTokens = parts.filter(p => /^(FEW|SCT|BKN|OVC)\d{3}/.test(p))
+    if (cloudTokens.length) {
+      const map = { FEW: 'Few', SCT: 'Scattered', BKN: 'Broken', OVC: 'Overcast' }
+      details.clouds = cloudTokens.map(tok => {
+        const m = tok.match(/^(FEW|SCT|BKN|OVC)(\d{3})/)
+        if (!m) return tok
+        const type = map[m[1]] || m[1]
+        const base = parseInt(m[2],10) * 100
+        return `${type} clouds at ${base.toLocaleString()} ft`
+      }).join(', ')
+    }
+
+    const tdp = parts.find(p => /^(M?\d{1,2})\/(M?\d{1,2})$/.test(p))
+    if (tdp) {
+      const m = tdp.match(/^(M?\d{1,2})\/(M?\d{1,2})$/)
+      const t = m[1].startsWith('M') ? -parseInt(m[1].slice(1),10) : parseInt(m[1],10)
+      const d = m[2].startsWith('M') ? -parseInt(m[2].slice(1),10) : parseInt(m[2],10)
+      details.temperature = `${t}°C / ${d}°C`
+    }
+
+    const qnh = parts.find(p => /^Q\d{4}$/.test(p))
+    const alt = parts.find(p => /^A\d{4}$/.test(p))
+    if (qnh) {
+      details.pressure = `${parseInt(qnh.slice(1),10)} hPa`
+    } else if (alt) {
+      const val = (parseInt(alt.slice(1),10) / 100).toFixed(2)
+      details.pressure = `${val} inHg`
+    }
+
+    return details
+  }
+      }
+      return parts.filter(Boolean).join(' ')
+    }
+
+    if (hasStructured) {
+      return assemble({ station, when, wind, vis, temp, press, wx, clouds, severity: res.severity })
+    }
+
+    // If no structured fields, try to convert any JSON embedded in decoded.summary
+    const rawSummary = res.decoded?.summary
+    if (looksJsonLike(rawSummary)) {
+      try {
+        const start = rawSummary.indexOf('{')
+        const end = rawSummary.lastIndexOf('}') + 1
+        const jsonText = rawSummary.slice(start, end)
+        const obj = JSON.parse(jsonText)
+        const _station = obj.airport || station
+        const _when = obj.time || when
+        const _wind = obj.wind || wind
+        const _vis = obj.visibility || vis
+        const _clouds = obj.clouds || clouds
+        const _temp = obj.temperature || temp
+        const _press = obj.pressure || press
+        return assemble({ station: _station, when: _when, wind: _wind, vis: _vis, temp: _temp, press: _press, wx: obj.weather || wx, clouds: _clouds, severity: res.severity })
+      } catch (e) {
+        // fall through to non-JSON fallback below
+      }
+    }
+
+    // Last resort: only use backend summary if it doesn't look like JSON or coded METAR
+    if (typeof rawSummary === 'string' && !looksJsonLike(rawSummary) && !looksCodedMetar(rawSummary)) {
+      return rawSummary
+    }
+
+    return ''
+  }
+
   const handleDecode = async () => {
     if (!input.trim()) return
     
     setLoading(true)
     try {
       const decoded = await weatherService.decodeWeather(input.trim(), type)
-      setResult(decoded)
+      // Fill in details if missing, then build summary from them
+      const parsedDetails = decoded?.decoded?.details && Object.keys(decoded.decoded.details).length > 0
+        ? decoded.decoded.details
+        : parseMetarDetails(input)
+
+      const ensured = {
+        ...decoded,
+        decoded: {
+          ...(decoded?.decoded || {}),
+          details: parsedDetails,
+          summary: buildPlainSummary({ ...decoded, decoded: { ...(decoded?.decoded || {}), details: parsedDetails } })
+        }
+      }
+      setResult(ensured)
     } catch (error) {
       console.error('Failed to decode weather:', error)
-      setResult({ 
-        success: false, 
-        error: error.message || 'Failed to decode weather data'
-      })
+      // Offline/local fallback: try to parse METAR locally into English
+      if (type === 'metar') {
+        const localDetails = parseMetarDetails(input)
+        const localRes = { success: true, decoded: { details: localDetails } }
+        const localSummary = buildPlainSummary(localRes)
+        setResult({ success: true, decoded: { details: localDetails, summary: localSummary }, type })
+      } else {
+        setResult({ success: false, error: error.message || 'Failed to decode weather data' })
+      }
     } finally {
       setLoading(false)
     }
@@ -30,7 +199,7 @@ const WeatherDecoder = ({ initialType = 'metar' }) => {
 
   const handleCopy = () => {
     if (result && result.success) {
-      const textToCopy = result.decoded?.summary || 'No decoded text available'
+      const textToCopy = result.decoded?.summary || buildPlainSummary(result) || 'No decoded text available'
       navigator.clipboard.writeText(textToCopy)
         .then(() => console.log('Copied to clipboard'))
         .catch(err => console.error('Failed to copy:', err))
@@ -186,7 +355,7 @@ const WeatherDecoder = ({ initialType = 'metar' }) => {
                     </button>
                   </div>
                   
-                  {result.parsed && (
+                  {(result.parsed || result.decoded?.summary) && (
                     <div className="mb-6">
                       <h3 className="font-semibold text-slate-900 mb-4 flex items-center space-x-2">
                         <Sparkles className="h-5 w-5 text-blue-600" />
@@ -194,7 +363,7 @@ const WeatherDecoder = ({ initialType = 'metar' }) => {
                       </h3>
                       <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                         <p className="text-slate-700 leading-relaxed">
-                          {result.decoded?.summary || 'No summary available'}
+                          {result.decoded?.summary || buildPlainSummary(result) || 'No summary available'}
                         </p>
                       </div>
                     </div>

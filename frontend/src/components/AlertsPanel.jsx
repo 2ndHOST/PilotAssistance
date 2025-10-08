@@ -1,7 +1,8 @@
 import { AlertTriangle, X, Volume2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import TTSControls from './TTSControls'
 
-const AlertsPanel = ({ alerts = [] }) => {
+const AlertsPanel = ({ alerts = [], compact = false, dense = false, fixedHeight = null, showTTS = false }) => {
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set())
   const [muteAlerts, setMuteAlerts] = useState(false)
 
@@ -33,85 +34,112 @@ const AlertsPanel = ({ alerts = [] }) => {
 
   const getSeverityTitle = (level) => {
     switch (level) {
-      case 'critical': return 'Critical Alert'
-      case 'caution': return 'Caution Advisory'
-      default: return 'Weather Notice'
+      case 'critical': return compact ? 'Critical' : 'Critical Alert'
+      case 'caution': return compact ? 'Caution' : 'Caution Advisory'
+      default: return compact ? 'Notice' : 'Weather Notice'
     }
   }
 
+  const truncate = (str, len) => {
+    if (!str) return ''
+    const s = String(str)
+    return s.length > len ? s.slice(0, len - 1) + '…' : s
+  }
+
+  const ttsText = useMemo(() => {
+    if (!activeAlerts.length) return 'There are no active weather alerts.'
+    const parts = activeAlerts.slice(0, 6).map(a => {
+      const sev = a?.severity?.level || 'unknown'
+      const icao = a?.icao || 'unknown'
+      const cond = a?.conditions || a?.message || ''
+      return `${sev} at ${icao}. ${truncate(cond.replace(/\s+/g, ' '), 80)}`
+    })
+    return `Active alerts: ${parts.join(' ')}.`
+  }, [activeAlerts])
+
+  const containerClasses = dense ? 'p-3' : (compact ? 'p-4' : 'p-6')
+  const cardPadding = dense ? 'p-2' : (compact ? 'p-3' : 'p-4')
+  const titleText = dense ? 'text-sm' : (compact ? 'text-base' : 'text-xl')
+  const bodyText = dense ? 'text-[11px]' : (compact ? 'text-xs' : 'text-sm')
+
   return (
-    <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-slate-900 flex items-center">
+    <div className={`bg-white border border-slate-200 shadow-sm rounded-xl ${containerClasses}`} style={fixedHeight ? { maxHeight: fixedHeight, overflowY: 'auto' } : {}}>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className={`${titleText} font-semibold text-slate-900 flex items-center`}>
           <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
           Active Alerts
           {activeAlerts.length > 0 && (
-            <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
+            <span className="ml-2 bg-red-100 text-red-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
               {activeAlerts.length}
             </span>
           )}
         </h2>
-        
-        {activeAlerts.length > 0 && (
-          <button
-            onClick={() => setMuteAlerts(!muteAlerts)}
-            className={`p-2 rounded-lg transition-colors ${
-              muteAlerts 
-                ? 'bg-slate-200 text-slate-600' 
-                : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-            }`}
-            title={muteAlerts ? 'Unmute alerts' : 'Mute alerts'}
-          >
-            <Volume2 className={`h-4 w-4 ${muteAlerts ? 'opacity-50' : ''}`} />
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {showTTS && (
+            <TTSControls text={ttsText} size="small" />
+          )}
+          {activeAlerts.length > 0 && (
+            <button
+              onClick={() => setMuteAlerts(!muteAlerts)}
+              className={`p-2 rounded-lg transition-colors ${
+                muteAlerts 
+                  ? 'bg-slate-200 text-slate-600' 
+                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              }`}
+              title={muteAlerts ? 'Unmute alerts' : 'Mute alerts'}
+            >
+              <Volume2 className={`h-4 w-4 ${muteAlerts ? 'opacity-50' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {activeAlerts.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No active weather alerts</p>
-            <p className="text-xs mt-1 opacity-70">All monitored airports show normal conditions</p>
+          <div className="text-center py-4 text-slate-500">
+            <AlertTriangle className="h-6 w-6 mx-auto mb-1 opacity-30" />
+            <p className="text-[11px]">No active weather alerts</p>
           </div>
         ) : (
           activeAlerts.map((alert) => (
             <div
               key={alert.icao}
-              className={`border rounded-lg p-4 ${getSeverityColor(alert.severity?.level || 'normal')} shadow-xs`}
+              className={`border rounded-lg ${cardPadding} ${getSeverityColor(alert.severity?.level || 'normal')} shadow-xs`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-xl">{alert.severity?.emoji || '⚠️'}</span>
+                  <div className={`flex items-center space-x-2 ${dense ? 'mb-0.5' : 'mb-1'}`}>
+                    <span className={dense ? 'text-base' : 'text-lg'}>{alert.severity?.emoji || '⚠️'}</span>
                     <div>
-                      <h3 className="font-semibold text-sm">
+                      <h3 className={`font-semibold ${dense ? 'text-[11px]' : 'text-xs'}`}>
                         {getSeverityTitle(alert.severity?.level || 'normal')}
                       </h3>
-                      <p className="text-xs opacity-70">Airport: {alert.icao}</p>
+                      <p className="text-[10px] opacity-70">{alert.icao}</p>
                     </div>
                   </div>
                   
-                  <p className="text-sm leading-relaxed mb-2">
-                    {alert.conditions || alert.message || 'No details available'}
+                  <p className={`${bodyText} leading-snug ${dense ? 'mb-0.5' : 'mb-1'}`}>
+                    {truncate(alert.conditions || alert.message || 'No details available', dense ? 60 : (compact ? 90 : 160))}
                   </p>
                   
-                  <div className="flex items-center justify-between text-xs opacity-70">
-                    <span>Updated {alert.updated || 'Unknown'}</span>
-                    {alert.severity?.level === 'critical' && (
-                      <span className="bg-red-200 text-red-800 px-2 py-1 rounded font-medium">
-                        IMMEDIATE ATTENTION
-                      </span>
-                    )}
-                  </div>
+                  {!dense && (
+                    <div className="flex items-center justify-between text-[10px] opacity-70">
+                      <span>{alert.updated || ''}</span>
+                      {alert.severity?.level === 'critical' && (
+                        <span className="bg-red-200 text-red-800 px-1.5 py-0.5 rounded font-medium">
+                          IMMEDIATE ATTENTION
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <button
                   onClick={() => dismissAlert(alert.icao)}
-                  className="ml-2 p-1 hover:bg-black hover:bg-opacity-10 rounded transition-colors"
+                  className={`ml-2 ${dense ? 'p-0.5' : 'p-1'} hover:bg-black hover:bg-opacity-10 rounded transition-colors`}
                   title="Dismiss alert"
                 >
-                  <X className="h-4 w-4" />
+                  <X className={dense ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
                 </button>
               </div>
             </div>
@@ -119,7 +147,7 @@ const AlertsPanel = ({ alerts = [] }) => {
         )}
       </div>
 
-      {activeAlerts.length > 0 && (
+      {activeAlerts.length > 0 && !compact && !dense && (
         <div className="mt-4 pt-4 border-t border-slate-200">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>{activeAlerts.length} active alert{activeAlerts.length !== 1 ? 's' : ''}</span>

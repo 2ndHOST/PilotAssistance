@@ -10,7 +10,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 })
 
-const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' }) => {
+const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px', airportNames = {} }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
@@ -277,6 +277,26 @@ const FlightMap = ({ route, airports = [], enroutePoints = [], height = '400px' 
               </span>
             )}
           </p>
+        )}
+        {route && route.origin && route.destination && (
+          (() => {
+            const findName = (icao) => {
+              const fromMap = airportNames?.[icao]
+              if (fromMap) return fromMap
+              const fromAirports = airports.find(a => a.icao === icao)
+              return fromAirports?.name || ''
+            }
+            const on = findName(route.origin)
+            const dn = findName(route.destination)
+            if (on || dn) {
+              return (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {on || '—'} → {dn || '—'}
+                </p>
+              )
+            }
+            return null
+          })()
         )}
       </div>
       
